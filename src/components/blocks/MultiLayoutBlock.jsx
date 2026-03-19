@@ -167,24 +167,24 @@ const DEFAULT_TRACKS = [
   },
 ];
 
-function TrackListLayout({ badgeText, badgeColor, tracks }) {
+function TrackListLayout({ badgeText, badgeColor, tracks, badgeFontSize = 14, titleFontSize = 13, bodyFontSize = 13 }) {
   const items = tracks && tracks.length > 0 ? tracks : DEFAULT_TRACKS;
   return (
     <div style={{ padding: 0, fontFamily: 'Poppins, sans-serif' }}>
       <div style={{ marginBottom: 8 }}>
-        <span style={{ display: 'inline-block', fontSize: 14, fontWeight: 600, letterSpacing: '0.06em', color: badgeColor, textTransform: 'uppercase' }}>
+        <span style={{ display: 'inline-block', fontSize: badgeFontSize, fontWeight: 600, letterSpacing: '0.06em', color: badgeColor, textTransform: 'uppercase' }}>
           {badgeText}
         </span>
       </div>
       <hr style={{ border: 'none', borderTop: '1px solid #E5E7EB', margin: '0 0 16px' }} />
       {items.map((track, ti) => (
         <div key={ti} style={{ marginBottom: ti < items.length - 1 ? 24 : 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.04em', color: '#1C1917', marginBottom: 8, textTransform: 'uppercase' }}>
+          <div style={{ fontSize: titleFontSize, fontWeight: 700, letterSpacing: '0.04em', color: '#1C1917', marginBottom: 8, textTransform: 'uppercase' }}>
             {track.title}
           </div>
           {track.subjects.map((subj, si) => (
-            <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13, color: '#6B7280', lineHeight: 1.6 }}>
-              <span style={{ fontSize: 12, color: '#9CA3AF', flexShrink: 0 }}>↳</span>
+            <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: bodyFontSize, color: '#6B7280', lineHeight: 1.6 }}>
+              <span style={{ fontSize: bodyFontSize - 1, color: '#9CA3AF', flexShrink: 0 }}>↳</span>
               <span>{subj}</span>
             </div>
           ))}
@@ -203,6 +203,9 @@ export default function MultiLayoutBlock({
   images = [],
   imageHeight = 180,
   imageBorderRadius = 12,
+  badgeFontSize = 14,
+  titleFontSize = 13,
+  bodyFontSize = 13,
   tracks,
   onSetLayoutImage,
 }) {
@@ -235,59 +238,21 @@ export default function MultiLayoutBlock({
 
   const renderTextFull = () => (
     <div style={{ padding: '8px 0 0' }}>
-      <div
-        style={{
-          fontSize: 13,
-          fontWeight: 700,
-          letterSpacing: '0.03em',
-          color: '#1C1917',
-          lineHeight: 1.3,
-          marginBottom: 6,
-        }}
-      >
+      <div style={{ fontSize: titleFontSize, fontWeight: 700, letterSpacing: '0.03em', color: '#1C1917', lineHeight: 1.3, marginBottom: 6 }}>
         {title}
       </div>
-      <div
-        style={{
-          fontSize: 13,
-          color: '#6B7280',
-          lineHeight: 1.65,
-          fontFamily: 'Poppins, sans-serif',
-        }}
-      >
+      <div style={{ fontSize: bodyFontSize, color: '#6B7280', lineHeight: 1.65, fontFamily: 'Poppins, sans-serif' }}>
         {body}
       </div>
     </div>
   );
 
   const renderTextTwoCol = () => (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '5fr 7fr',
-        gap: 12,
-        padding: '8px 0 0',
-      }}
-    >
-      <div
-        style={{
-          fontSize: 13,
-          fontWeight: 700,
-          letterSpacing: '0.03em',
-          color: '#1C1917',
-          lineHeight: 1.3,
-        }}
-      >
+    <div style={{ display: 'grid', gridTemplateColumns: '5fr 7fr', gap: 12, padding: '8px 0 0' }}>
+      <div style={{ fontSize: titleFontSize, fontWeight: 700, letterSpacing: '0.03em', color: '#1C1917', lineHeight: 1.3 }}>
         {title}
       </div>
-      <div
-        style={{
-          fontSize: 13,
-          color: '#6B7280',
-          lineHeight: 1.65,
-          fontFamily: 'Poppins, sans-serif',
-        }}
-      >
+      <div style={{ fontSize: bodyFontSize, color: '#6B7280', lineHeight: 1.65, fontFamily: 'Poppins, sans-serif' }}>
         {body}
       </div>
     </div>
@@ -296,7 +261,7 @@ export default function MultiLayoutBlock({
   if (preset.textLayout === 'track-list') {
     return (
       <>
-        <TrackListLayout badgeText={badgeText} badgeColor={badgeColor} tracks={tracks} />
+        <TrackListLayout badgeText={badgeText} badgeColor={badgeColor} tracks={tracks} badgeFontSize={badgeFontSize} titleFontSize={titleFontSize} bodyFontSize={bodyFontSize} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, padding: '4px 8px', background: '#F4F4F5', borderRadius: 6, width: 'fit-content', fontSize: 10, color: '#71717A' }}>
           <ChevronDown size={10} />
           {preset.label}
@@ -312,7 +277,7 @@ export default function MultiLayoutBlock({
         <span
           style={{
             display: 'inline-block',
-            fontSize: 14,
+            fontSize: badgeFontSize,
             fontWeight: 600,
             letterSpacing: '0.06em',
             color: badgeColor,
@@ -336,10 +301,10 @@ export default function MultiLayoutBlock({
               onSetImage={onSetLayoutImage ? () => onSetLayoutImage(i) : undefined}
             />
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.03em', color: '#1C1917', lineHeight: 1.3, marginBottom: 6 }}>
+              <div style={{ fontSize: titleFontSize, fontWeight: 700, letterSpacing: '0.03em', color: '#1C1917', lineHeight: 1.3, marginBottom: 6 }}>
                 {title}
               </div>
-              <div style={{ fontSize: 12, color: '#6B7280', lineHeight: 1.65, fontFamily: 'Poppins, sans-serif' }}>
+              <div style={{ fontSize: bodyFontSize, color: '#6B7280', lineHeight: 1.65, fontFamily: 'Poppins, sans-serif' }}>
                 {body}
               </div>
             </div>
@@ -357,10 +322,10 @@ export default function MultiLayoutBlock({
                 onSetImage={onSetLayoutImage ? () => onSetLayoutImage(0) : undefined}
               />
               <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.03em', color: '#1C1917', lineHeight: 1.3, marginBottom: 6 }}>
+                <div style={{ fontSize: titleFontSize, fontWeight: 700, letterSpacing: '0.03em', color: '#1C1917', lineHeight: 1.3, marginBottom: 6 }}>
                   {title}
                 </div>
-                <div style={{ fontSize: 12, color: '#6B7280', lineHeight: 1.65, fontFamily: 'Poppins, sans-serif' }}>
+                <div style={{ fontSize: bodyFontSize, color: '#6B7280', lineHeight: 1.65, fontFamily: 'Poppins, sans-serif' }}>
                   {body}
                 </div>
               </div>
@@ -376,8 +341,8 @@ export default function MultiLayoutBlock({
           }
           {preset.textLayout === 'centered' ? (
             <div style={{ padding: '8px 0 0', textAlign: 'center' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.03em', color: '#1C1917', lineHeight: 1.3, marginBottom: 6 }}>{title}</div>
-              <div style={{ fontSize: 13, color: '#6B7280', lineHeight: 1.65, fontFamily: 'Poppins, sans-serif' }}>{body}</div>
+              <div style={{ fontSize: titleFontSize, fontWeight: 700, letterSpacing: '0.03em', color: '#1C1917', lineHeight: 1.3, marginBottom: 6 }}>{title}</div>
+              <div style={{ fontSize: bodyFontSize, color: '#6B7280', lineHeight: 1.65, fontFamily: 'Poppins, sans-serif' }}>{body}</div>
             </div>
           ) : preset.textLayout === 'images-then-two-col' ? renderTextTwoCol() : renderTextFull()}
         </>

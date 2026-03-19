@@ -916,6 +916,9 @@ function exportMultiLayout(block) {
   const layout = block.layout || 'two-col-wide';
   const borderRadius = block.imageBorderRadius || 12;
   const imgHeight = block.imageHeight || 180;
+  const bfs = block.badgeFontSize || 14;
+  const tfs = block.titleFontSize || 13;
+  const dfs = block.bodyFontSize || 13;
 
   if (layout === 'track-list') {
     const tracks = block.tracks || [
@@ -926,13 +929,13 @@ function exportMultiLayout(block) {
     ];
     const tracksHtml = tracks.map((t) => {
       const subjectsHtml = t.subjects.map(s =>
-        `<tr><td style="padding:2px 0;font-size:13px;color:#6B7280;line-height:1.6;font-family:${fontStack};">↳&nbsp; ${s}</td></tr>`
+        `<tr><td style="padding:2px 0;font-size:${dfs}px;color:#6B7280;line-height:1.6;font-family:${fontStack};">↳&nbsp; ${s}</td></tr>`
       ).join('');
-      return `<tr><td style="padding:16px 0 4px;font-size:13px;font-weight:700;letter-spacing:0.04em;color:#1C1917;text-transform:uppercase;font-family:${fontStack};">${t.title}</td></tr>${subjectsHtml}`;
+      return `<tr><td style="padding:16px 0 4px;font-size:${tfs}px;font-weight:700;letter-spacing:0.04em;color:#1C1917;text-transform:uppercase;font-family:${fontStack};">${t.title}</td></tr>${subjectsHtml}`;
     }).join('');
     return `
       <div style="font-family:${fontStack};">
-        <div style="font-size:14px;font-weight:600;color:${badgeClr};letter-spacing:0.06em;text-transform:uppercase;padding:0 0 4px;">${badge}</div>
+        <div style="font-size:${bfs}px;font-weight:600;color:${badgeClr};letter-spacing:0.06em;text-transform:uppercase;padding:0 0 4px;">${badge}</div>
         <hr style="border:none;border-top:1px solid #E5E7EB;margin:0 0 8px;" />
         <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${tracksHtml}</table>
       </div>`;
@@ -964,12 +967,12 @@ function exportMultiLayout(block) {
   }).join('');
 
   const textHtml = layout === 'two-col-text-side' || layout === 'hero-side'
-    ? `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr><td style="width:42%;vertical-align:top;padding-right:12px;font-size:13px;font-weight:700;color:#1C1917;letter-spacing:0.03em;line-height:1.3;">${title}</td><td style="width:58%;vertical-align:top;font-size:13px;color:#6B7280;line-height:1.65;font-family:${fontStack};">${body}</td></tr></table>`
-    : `<div style="font-size:13px;font-weight:700;color:#1C1917;letter-spacing:0.03em;line-height:1.3;margin-bottom:6px;">${title}</div><div style="font-size:13px;color:#6B7280;line-height:1.65;">${body}</div>`;
+    ? `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr><td style="width:42%;vertical-align:top;padding-right:12px;font-size:${tfs}px;font-weight:700;color:#1C1917;letter-spacing:0.03em;line-height:1.3;">${title}</td><td style="width:58%;vertical-align:top;font-size:${dfs}px;color:#6B7280;line-height:1.65;font-family:${fontStack};">${body}</td></tr></table>`
+    : `<div style="font-size:${tfs}px;font-weight:700;color:#1C1917;letter-spacing:0.03em;line-height:1.3;margin-bottom:6px;">${title}</div><div style="font-size:${dfs}px;color:#6B7280;line-height:1.65;">${body}</div>`;
 
   return `
     <div style="font-family:${fontStack};">
-      <div style="font-size:14px;font-weight:600;color:${badgeClr};letter-spacing:0.06em;text-transform:uppercase;padding:0 0 4px;">${badge}</div>
+      <div style="font-size:${bfs}px;font-weight:600;color:${badgeClr};letter-spacing:0.06em;text-transform:uppercase;padding:0 0 4px;">${badge}</div>
       <hr style="border:none;border-top:1px solid #E5E7EB;margin:0 0 12px;" />
       ${imageRowsHtml}
       <div style="padding:8px 0 0;">${textHtml}</div>

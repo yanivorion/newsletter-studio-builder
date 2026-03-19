@@ -2195,6 +2195,38 @@ function SidebarEditor({
         />
       </FieldGroup>
 
+      <FieldGroup label="Font Sizes">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+          <div>
+            <label className="text-[10px] text-zinc-400 mb-1 block">Badge</label>
+            <NumberInput
+              value={block?.badgeFontSize || 14}
+              min={8}
+              max={32}
+              onChange={(val) => handleFieldChange('badgeFontSize', val)}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-zinc-400 mb-1 block">Title</label>
+            <NumberInput
+              value={block?.titleFontSize || 13}
+              min={8}
+              max={48}
+              onChange={(val) => handleFieldChange('titleFontSize', val)}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-zinc-400 mb-1 block">Body</label>
+            <NumberInput
+              value={block?.bodyFontSize || 13}
+              min={8}
+              max={32}
+              onChange={(val) => handleFieldChange('bodyFontSize', val)}
+            />
+          </div>
+        </div>
+      </FieldGroup>
+
       {(block?.layout || 'two-col-wide') === 'track-list' ? (
         <>
           <FieldGroup label="Tracks">

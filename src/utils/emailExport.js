@@ -389,8 +389,8 @@ export function exportForGmail(newsletter) {
   // Build inner container style
   const innerContainerStyle = `background-color: ${innerBg};${innerBorderWidth > 0 ? ` border: ${innerBorderWidth}px solid ${innerBorderColor};` : ''}${innerBorderRadius > 0 ? ` border-radius: ${innerBorderRadius}px;` : ''} overflow: hidden;`;
 
-  // For Gmail - single 700px table, no outer wrapper (Gmail compose already provides the background)
-  const html = `<table role="presentation" align="center" cellspacing="0" cellpadding="0" border="0" width="700" style="background-color:${innerBg};width:700px;max-width:700px;margin:0 auto;font-family:${FONT_STACKS['default']};table-layout:fixed;${innerBorderWidth > 0 ? `border:${innerBorderWidth}px solid ${innerBorderColor};` : ''}${innerBorderRadius > 0 ? `border-radius:${innerBorderRadius}px;` : ''}overflow:hidden;">${sections}</table>`;
+  // For Gmail - 700px wrapper with inner table (no visible outer background)
+  const html = `<div style="max-width:700px;width:700px;margin:0 auto;font-family:${FONT_STACKS['default']};"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:${innerBg};width:100%;table-layout:fixed;${innerBorderWidth > 0 ? `border:${innerBorderWidth}px solid ${innerBorderColor};` : ''}${innerBorderRadius > 0 ? `border-radius:${innerBorderRadius}px;` : ''}overflow:hidden;">${sections}</table></div>`;
   
   return minifyHTML(html);
 }

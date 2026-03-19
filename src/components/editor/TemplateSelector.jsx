@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { ArrowRight, FolderOpen, Upload, Trash2, FileJson, Sparkles } from 'lucide-react';
+import { ArrowRight, Upload, Trash2, Sparkles } from 'lucide-react';
 import { createStudio2Template } from '../../lib/templates/studio-2-newsletter';
 import { createSavedTemplate1 } from '../../lib/templates/saved-template-1';
 
@@ -83,7 +83,6 @@ function TemplateSelector({
   onImportJSON
 }) {
   const [hoveredButton, setHoveredButton] = useState(null);
-  const [hoveredProject, setHoveredProject] = useState(null);
   const fileInputRef = useRef(null);
 
   const handleFileUpload = async (e) => {
@@ -391,125 +390,103 @@ function TemplateSelector({
                 </div>
               </div>
             </button>
-          </div>
-        </div>
 
-        {/* Saved Projects Section */}
-        {projects.length > 0 && (
-          <div style={{
-            marginTop: '80px',
-            textAlign: 'left'
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '24px',
-              justifyContent: 'center'
-            }}>
-              <FolderOpen size={20} color={subheadlineColor} />
-              <h2 style={{
-                fontSize: '18px',
-                fontWeight: '500',
-                color: heroTextColor,
-                margin: 0
-              }}>
-                Your Projects ({projects.length})
-              </h2>
-            </div>
-            
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-              gap: '16px',
-              maxWidth: '900px',
-              margin: '0 auto'
-            }}>
-              {projects.map(project => (
+            {/* Saved Projects as Template Cards */}
+            {projects.map(project => {
+              const header = project.data?.sections?.find(s => s.type === 'header');
+              const coverUrl = header?.backgroundImage || header?.background?.image || null;
+              const hKey = `tpl-proj-${project.id}`;
+              return (
                 <div
                   key={project.id}
-                  onClick={() => onLoadProject?.(project.id)}
-                  onMouseEnter={() => setHoveredProject(project.id)}
-                  onMouseLeave={() => setHoveredProject(null)}
-                  style={{
-                    backgroundColor: '#FFFFFF',
-                    border: `1px solid ${hoveredProject === project.id ? '#1C1917' : cardBorderColor}`,
-                    borderRadius: '12px',
-                    padding: '20px',
-                    cursor: 'pointer',
-                    transition: 'all 200ms ease-out',
-                    transform: hoveredProject === project.id ? 'translateY(-2px)' : 'translateY(0)',
-                    boxShadow: hoveredProject === project.id ? '0 8px 24px rgba(0,0,0,0.1)' : '0 2px 8px rgba(0,0,0,0.04)',
-                    position: 'relative'
-                  }}
+                  style={{ position: 'relative' }}
                 >
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start'
-                  }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                  <button
+                    onClick={() => onLoadProject?.(project.id)}
+                    onMouseEnter={() => setHoveredButton(hKey)}
+                    onMouseLeave={() => setHoveredButton(null)}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'stretch',
+                      backgroundColor: '#FFFFFF',
+                      border: `1px solid ${hoveredButton === hKey ? '#1C1917' : cardBorderColor}`,
+                      borderRadius: '12px',
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      transition: 'all 200ms ease-out',
+                      transform: hoveredButton === hKey ? 'translateY(-2px)' : 'translateY(0)',
+                      boxShadow: hoveredButton === hKey ? '0 8px 24px rgba(0,0,0,0.1)' : '0 2px 8px rgba(0,0,0,0.04)',
+                      padding: 0,
+                      textAlign: 'left',
+                      width: '100%',
+                    }}
+                  >
+                    <div style={{
+                      height: 160,
+                      backgroundImage: coverUrl ? `url(${coverUrl})` : undefined,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center top',
+                      backgroundColor: coverUrl ? undefined : '#F5F5F5',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'flex-end',
+                      padding: '16px 20px',
+                    }}>
+                      {!coverUrl && (
+                        <div style={{ fontSize: 12, color: '#9CA3AF', textAlign: 'center', width: '100%' }}>
+                          No cover image
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ padding: '16px 20px' }}>
                       <div style={{
-                        fontSize: '16px',
-                        fontWeight: '500',
-                        color: heroTextColor,
-                        marginBottom: '4px',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
+                        fontSize: 14, fontWeight: 600, color: heroTextColor, marginBottom: 4,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>
                         {project.name}
                       </div>
-                      <div style={{
-                        fontSize: '13px',
-                        color: subheadlineColor
-                      }}>
-                        {new Date(project.updatedAt).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric'
-                        })}
+                      <div style={{ fontSize: 12, color: subheadlineColor }}>
+                        {new Date(project.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {' · '}
+                        {project.data?.sections?.length || 0} sections
                       </div>
                     </div>
-                    {onDeleteProject && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (confirm('Delete this project?')) {
-                            onDeleteProject(project.id);
-                          }
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          padding: '4px',
-                          cursor: 'pointer',
-                          opacity: hoveredProject === project.id ? 1 : 0,
-                          transition: 'opacity 150ms',
-                          color: '#EF4444',
-                          borderRadius: '4px'
-                        }}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                  </div>
-                  <div style={{
-                    marginTop: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '12px',
-                    color: subheadlineColor
-                  }}>
-                    <FileJson size={14} />
-                    {project.data?.sections?.length || 0} sections
-                  </div>
+                  </button>
+                  {onDeleteProject && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm('Delete this project?')) onDeleteProject(project.id);
+                      }}
+                      onMouseEnter={() => setHoveredButton(hKey)}
+                      style={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        background: 'rgba(255,255,255,0.85)',
+                        backdropFilter: 'blur(4px)',
+                        border: '1px solid rgba(0,0,0,0.08)',
+                        borderRadius: '6px',
+                        padding: '4px 6px',
+                        cursor: 'pointer',
+                        opacity: hoveredButton === hKey ? 1 : 0,
+                        transition: 'opacity 150ms',
+                        color: '#EF4444',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
-        )}
+        </div>
+
       </div>
     </div>
   );

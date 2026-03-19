@@ -2216,7 +2216,7 @@ function SidebarEditor({
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-zinc-400 w-10 flex-shrink-0">Badge</span>
             <NumberInput
-              value={block?.badgeFontSize || 16}
+              value={block?.badgeFontSize || 19}
               min={8}
               max={32}
               step={1}
@@ -2227,7 +2227,7 @@ function SidebarEditor({
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-zinc-400 w-10 flex-shrink-0">Title</span>
             <NumberInput
-              value={block?.titleFontSize || 15}
+              value={block?.titleFontSize || 17}
               min={8}
               max={48}
               step={1}

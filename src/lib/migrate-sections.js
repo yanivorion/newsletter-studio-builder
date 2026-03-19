@@ -104,9 +104,9 @@ function normalizeSectionDefaults(section) {
   const bumpLayoutFonts = (block) => {
     if (block.type !== 'multi-layout') return block;
     const b = { ...block };
-    if (!b.badgeFontSize || b.badgeFontSize === 14) b.badgeFontSize = 16;
-    if (!b.titleFontSize || b.titleFontSize === 13) b.titleFontSize = 15;
-    if (!b.bodyFontSize || b.bodyFontSize === 13) b.bodyFontSize = 15;
+    if (!b.badgeFontSize || b.badgeFontSize <= 16) b.badgeFontSize = 19;
+    if (!b.titleFontSize || b.titleFontSize <= 15) b.titleFontSize = 17;
+    if (!b.bodyFontSize || b.bodyFontSize <= 13) b.bodyFontSize = 15;
     return b;
   };
 

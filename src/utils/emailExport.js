@@ -942,6 +942,7 @@ function exportMultiLayout(block) {
   }
 
   const PRESETS = {
+    'hero-text':         { rows: [[12]] },
     'two-col-wide':      { rows: [[5, 7]] },
     'three-col':         { rows: [[4, 4, 4]] },
     'two-by-two':        { rows: [[6, 6], [6, 6]] },

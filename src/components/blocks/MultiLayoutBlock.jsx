@@ -20,6 +20,12 @@ const LAYOUT_PRESETS = {
     textLayout: 'full',
     thumbnail: '/media-kit/layout-text-list.png',
   },
+  'hero-text': {
+    label: 'Hero + Text',
+    images: [{ span: 12 }],
+    textLayout: 'full',
+    thumbnail: '/media-kit/layout-hero-text.png',
+  },
   'hero-repeat': {
     label: 'Image + Text Rows',
     images: [{ span: 5 }, { span: 5 }, { span: 5 }],

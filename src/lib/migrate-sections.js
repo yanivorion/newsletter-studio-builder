@@ -101,6 +101,31 @@ function normalizeSectionDefaults(section) {
 
   if (s.type === 'footer') return s;
 
+  const bumpLayoutFonts = (block) => {
+    if (block.type !== 'multi-layout') return block;
+    const b = { ...block };
+    if (!b.badgeFontSize || b.badgeFontSize === 14) b.badgeFontSize = 16;
+    if (!b.titleFontSize || b.titleFontSize === 13) b.titleFontSize = 15;
+    if (!b.bodyFontSize || b.bodyFontSize === 13) b.bodyFontSize = 15;
+    return b;
+  };
+
+  if (Array.isArray(s.blocks)) {
+    s = { ...s, blocks: s.blocks.map(bumpLayoutFonts) };
+  }
+  if (Array.isArray(s.rows)) {
+    s = {
+      ...s,
+      rows: s.rows.map(row => ({
+        ...row,
+        columns: row.columns.map(col => ({
+          ...col,
+          blocks: (col.blocks || []).map(bumpLayoutFonts),
+        })),
+      })),
+    };
+  }
+
   if (!isGridSection(s) && Array.isArray(s.blocks) && s.blocks.length > 0) {
     s = { ...s, rows: blocksToRows(s.blocks) };
   }

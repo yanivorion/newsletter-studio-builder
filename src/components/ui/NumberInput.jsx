@@ -83,13 +83,17 @@ export function NumberInput({
     }
   };
 
-  const increment = () => {
+  const increment = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
     const newVal = Math.min(max, (parseInt(localValue, 10) || 0) + step);
     setLocalValue(newVal.toString());
     onChange(newVal);
   };
 
-  const decrement = () => {
+  const decrement = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
     const newVal = Math.max(min, (parseInt(localValue, 10) || 0) - step);
     setLocalValue(newVal.toString());
     onChange(newVal);
@@ -105,10 +109,11 @@ export function NumberInput({
       <button
         type="button"
         onClick={decrement}
-        className="h-full px-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50 transition-colors"
+        onMouseDown={(e) => e.stopPropagation()}
+        className="flex-shrink-0 w-8 h-full flex items-center justify-center text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 active:bg-zinc-200 transition-colors cursor-pointer"
         tabIndex={-1}
       >
-        <Minus className="w-3 h-3" />
+        <Minus className="w-3 h-3 pointer-events-none" />
       </button>
       
       <div className="flex-1 flex items-center justify-center">
@@ -132,10 +137,11 @@ export function NumberInput({
       <button
         type="button"
         onClick={increment}
-        className="h-full px-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50 transition-colors"
+        onMouseDown={(e) => e.stopPropagation()}
+        className="flex-shrink-0 w-8 h-full flex items-center justify-center text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 active:bg-zinc-200 transition-colors cursor-pointer"
         tabIndex={-1}
       >
-        <Plus className="w-3 h-3" />
+        <Plus className="w-3 h-3 pointer-events-none" />
       </button>
     </div>
   );

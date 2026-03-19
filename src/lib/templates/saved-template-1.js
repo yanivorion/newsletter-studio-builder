@@ -15,30 +15,30 @@ export function createSavedTemplate1() {
       innerBorderRadius: 0,
     },
     sections: [
-      // ─── Header ────
+      // ─── Header: Cover image ────
       {
         id: `section-${ts()}`,
         type: 'header',
         preset: null,
         background: defaultBackground({
-          type: 'gradient',
-          color: '#FFFFFF',
-          gradientStart: '#FFFFFF',
-          gradientEnd: '#F5F5F5',
-          gradientAngle: 180,
+          type: 'image',
+          image: '/media-kit/cover-5.png',
+          imageSize: 'cover',
+          imagePosition: 'center',
+          fallbackColor: '#E8E8EC',
+          color: '#E8E8EC',
         }),
-        padding: defaultPadding({ top: 48, bottom: 48, left: 24, right: 24 }),
+        padding: defaultPadding({ top: 0, bottom: 0, left: 0, right: 0 }),
         height: 350,
         minHeight: null,
         blocks: [],
         rows: [createGridRow([createGridColumn(12, [])])],
       },
 
-      // ─── Content: 3-column layout ────
+      // ─── Section 1: Two-column wide layout ────
       {
         id: `section-${ts()}`,
         type: 'section',
-        name: null,
         preset: null,
         background: defaultBackground({ type: 'solid', color: '#FFFFFF' }),
         padding: defaultPadding({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -49,14 +49,96 @@ export function createSavedTemplate1() {
           createGridRow([
             createGridColumn(12, [
               createBlock('multiLayout', {
-                layout: 'three-col',
+                layout: 'two-col-wide',
                 badgeText: 'BUILDER',
                 badgeColor: '#1a1a3e',
+                badgeFontSize: 14,
+                titleFontSize: 14,
+                bodyFontSize: 14,
                 title: 'THE LOOK & FEEL OF STUDIO 2.0',
                 body: 'The first real look at the Studio 2.0 editor shell. Top Bar, Side Bar, and Side Panels live and interactive. We showcased the design decisions, UX direction, and visual language that define how Studio 2.0 feels.',
                 images: [],
                 imageHeight: 180,
                 imageBorderRadius: 12,
+              }),
+            ]),
+          ]),
+        ],
+      },
+
+      // ─── Section 2: Full-width image ────
+      {
+        id: `section-${ts()}`,
+        type: 'section',
+        preset: null,
+        background: defaultBackground({ type: 'solid', color: '#FFFFFF' }),
+        padding: defaultPadding({ top: 0, bottom: 0, left: 0, right: 0 }),
+        height: 'auto',
+        minHeight: null,
+        blocks: [],
+        rows: [
+          createGridRow([
+            createGridColumn(12, [
+              createBlock('image', {
+                src: '/media-kit/newsletter-template.png',
+                width: '100%',
+                height: 'auto',
+                objectFit: 'cover',
+              }),
+            ]),
+          ]),
+        ],
+      },
+
+      // ─── Sections 3–6: Hero-text layouts ────
+      ...[1, 2, 3, 4].map(() => ({
+        id: `section-${ts()}`,
+        type: 'section',
+        preset: null,
+        background: defaultBackground({ type: 'solid', color: '#FFFFFF' }),
+        padding: defaultPadding({ top: 60, bottom: 0, left: 0, right: 0 }),
+        height: 'auto',
+        minHeight: null,
+        blocks: [],
+        rows: [
+          createGridRow([
+            createGridColumn(12, [
+              createBlock('multiLayout', {
+                layout: 'hero-text',
+                badgeText: 'BUILDER',
+                badgeColor: '#1a1a3e',
+                badgeFontSize: 14,
+                titleFontSize: 13,
+                bodyFontSize: 13,
+                title: 'THE LOOK & FEEL OF STUDIO 2.0',
+                body: 'The first real look at the Studio 2.0 editor shell. Top Bar, Side Bar, and Side Panels live and interactive. We showcased the design decisions, UX direction, and visual language that define how Studio 2.0 feels.',
+                images: [],
+                imageHeight: 180,
+                imageBorderRadius: 12,
+              }),
+            ]),
+          ]),
+        ],
+      })),
+
+      // ─── Section 7: Full-width image (Wix Studio) ────
+      {
+        id: `section-${ts()}`,
+        type: 'section',
+        preset: null,
+        background: defaultBackground({ type: 'solid', color: '#FFFFFF' }),
+        padding: defaultPadding({ top: 0, bottom: 0, left: 0, right: 0 }),
+        height: 'auto',
+        minHeight: null,
+        blocks: [],
+        rows: [
+          createGridRow([
+            createGridColumn(12, [
+              createBlock('image', {
+                src: '/media-kit/cover-6.png',
+                width: '100%',
+                height: 'auto',
+                objectFit: 'cover',
               }),
             ]),
           ]),

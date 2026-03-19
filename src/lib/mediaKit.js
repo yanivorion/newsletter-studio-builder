@@ -81,6 +81,12 @@ export const mediaKit = {
       category: 'cover'
     },
     {
+      id: 'cover-5',
+      name: 'Cover — Checkpoint³',
+      url: '/media-kit/cover-5.png',
+      category: 'cover'
+    },
+    {
       id: 'cover-nologo-1',
       name: 'Cover No Logo — 1',
       url: '/media-kit/cover-nologo-1.png',

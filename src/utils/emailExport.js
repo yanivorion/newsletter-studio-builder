@@ -389,8 +389,8 @@ export function exportForGmail(newsletter) {
   // Build inner container style
   const innerContainerStyle = `background-color: ${innerBg};${innerBorderWidth > 0 ? ` border: ${innerBorderWidth}px solid ${innerBorderColor};` : ''}${innerBorderRadius > 0 ? ` border-radius: ${innerBorderRadius}px;` : ''} overflow: hidden;`;
 
-  // For Gmail - Minified output
-  const html = `<table role="presentation" align="center" cellspacing="0" cellpadding="0" border="0" width="700" style="background-color:${outerBg};width:700px;max-width:700px;margin:0 auto;font-family:${FONT_STACKS['default']};table-layout:fixed"><tr><td style="padding:${outerPadding}px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="${innerContainerStyle}width:100%;table-layout:fixed">${sections}</table></td></tr></table>`;
+  // For Gmail - single 700px table, no outer wrapper (Gmail compose already provides the background)
+  const html = `<table role="presentation" align="center" cellspacing="0" cellpadding="0" border="0" width="700" style="background-color:${innerBg};width:700px;max-width:700px;margin:0 auto;font-family:${FONT_STACKS['default']};table-layout:fixed;${innerBorderWidth > 0 ? `border:${innerBorderWidth}px solid ${innerBorderColor};` : ''}${innerBorderRadius > 0 ? `border-radius:${innerBorderRadius}px;` : ''}overflow:hidden;">${sections}</table>`;
   
   return minifyHTML(html);
 }
@@ -945,17 +945,60 @@ function exportMultiLayout(block) {
       </div>`;
   }
 
+  const badgeHtml = `<div style="font-size:${bfs}px;font-weight:600;color:${badgeClr};letter-spacing:0.06em;text-transform:uppercase;padding:0 0 4px;">${badge}</div>
+      <hr style="border:none;border-top:1px solid #E5E7EB;margin:0 0 12px;" />`;
+
   const PRESETS = {
+    'text-only':         { rows: [], textOnly: true },
+    'text-centered':     { rows: [], textOnly: true, centered: true },
+    'text-list':         { rows: [], textOnly: true },
     'hero-text':         { rows: [[12]] },
     'hero-above':        { rows: [[12]], imageAboveBadge: true },
+    'hero-repeat':       { rows: [[5]], repeatSide: true },
+    'hero-side':         { rows: [[5]], sideBySide: true },
     'two-col-wide':      { rows: [[5, 7]] },
     'three-col':         { rows: [[4, 4, 4]] },
     'two-by-two':        { rows: [[6, 6], [6, 6]] },
     'two-col-equal':     { rows: [[6, 6]] },
     'two-col-text-side': { rows: [[6, 6]] },
-    'hero-side':         { rows: [[8]] },
   };
   const preset = PRESETS[layout] || PRESETS['two-col-wide'];
+
+  if (preset.textOnly) {
+    const align = preset.centered ? 'center' : 'left';
+    return `<div style="font-family:${fontStack};">
+      ${badgeHtml}
+      <div style="padding:8px 0 0;text-align:${align};">
+        <div style="font-size:${tfs}px;font-weight:700;color:#1C1917;letter-spacing:0.03em;line-height:1.3;margin-bottom:6px;">${title}</div>
+        <div style="font-size:${dfs}px;color:#6B7280;line-height:1.65;">${body}</div>
+      </div>
+    </div>`;
+  }
+
+  if (preset.repeatSide) {
+    const images3 = [images[0], images[1], images[2]].filter(Boolean);
+    const repeatHtml = images3.map((src, i) => {
+      const imgCell = src
+        ? `<td style="width:42%;vertical-align:top;padding:0 8px ${i < images3.length - 1 ? 16 : 0}px 0;"><img src="${src}" alt="" style="display:block;width:100%;height:${imgHeight}px;object-fit:cover;border-radius:${borderRadius}px;" /></td>`
+        : `<td style="width:42%;vertical-align:top;padding:0 8px ${i < images3.length - 1 ? 16 : 0}px 0;"><div style="width:100%;height:${imgHeight}px;background:#f4f4f5;border-radius:${borderRadius}px;"></div></td>`;
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;${i < images3.length - 1 ? 'margin-bottom:16px;' : ''}"><tr>${imgCell}<td style="width:58%;vertical-align:middle;padding-left:12px;"><div style="font-size:${tfs}px;font-weight:700;color:#1C1917;letter-spacing:0.03em;line-height:1.3;margin-bottom:6px;">${title}</div><div style="font-size:${dfs}px;color:#6B7280;line-height:1.65;">${body}</div></td></tr></table>`;
+    }).join('');
+    return `<div style="font-family:${fontStack};">
+      ${badgeHtml}
+      ${repeatHtml}
+    </div>`;
+  }
+
+  if (preset.sideBySide) {
+    const src0 = images[0];
+    const imgCell = src0
+      ? `<td style="width:42%;vertical-align:top;padding-right:12px;"><img src="${src0}" alt="" style="display:block;width:100%;height:${imgHeight}px;object-fit:cover;border-radius:${borderRadius}px;" /></td>`
+      : `<td style="width:42%;vertical-align:top;padding-right:12px;"><div style="width:100%;height:${imgHeight}px;background:#f4f4f5;border-radius:${borderRadius}px;"></div></td>`;
+    return `<div style="font-family:${fontStack};">
+      ${badgeHtml}
+      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr>${imgCell}<td style="width:58%;vertical-align:middle;"><div style="font-size:${tfs}px;font-weight:700;color:#1C1917;letter-spacing:0.03em;line-height:1.3;margin-bottom:6px;">${title}</div><div style="font-size:${dfs}px;color:#6B7280;line-height:1.65;">${body}</div></td></tr></table>
+    </div>`;
+  }
 
   let imgIdx = 0;
   const imageRowsHtml = preset.rows.map((cols) => {
@@ -972,12 +1015,9 @@ function exportMultiLayout(block) {
     return `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr>${cellsHtml}</tr></table>`;
   }).join('');
 
-  const textHtml = layout === 'two-col-text-side' || layout === 'hero-side'
+  const textHtml = layout === 'two-col-text-side'
     ? `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr><td style="width:42%;vertical-align:top;padding-right:12px;font-size:${tfs}px;font-weight:700;color:#1C1917;letter-spacing:0.03em;line-height:1.3;">${title}</td><td style="width:58%;vertical-align:top;font-size:${dfs}px;color:#6B7280;line-height:1.65;font-family:${fontStack};">${body}</td></tr></table>`
     : `<div style="font-size:${tfs}px;font-weight:700;color:#1C1917;letter-spacing:0.03em;line-height:1.3;margin-bottom:6px;">${title}</div><div style="font-size:${dfs}px;color:#6B7280;line-height:1.65;">${body}</div>`;
-
-  const badgeHtml = `<div style="font-size:${bfs}px;font-weight:600;color:${badgeClr};letter-spacing:0.06em;text-transform:uppercase;padding:0 0 4px;">${badge}</div>
-      <hr style="border:none;border-top:1px solid #E5E7EB;margin:0 0 12px;" />`;
 
   return preset.imageAboveBadge
     ? `<div style="font-family:${fontStack};">

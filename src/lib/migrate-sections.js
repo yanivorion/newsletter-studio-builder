@@ -18,19 +18,42 @@ export function isNewFormat(newsletter) {
 export function migrateNewsletter(newsletter) {
   if (!newsletter?.sections?.length) return newsletter;
 
+  let sections;
   if (isNewFormat(newsletter)) {
-    return {
-      ...newsletter,
-      sections: newsletter.sections.map(normalizeSectionDefaults),
-    };
+    sections = newsletter.sections.map(normalizeSectionDefaults);
+  } else {
+    sections = newsletter.sections.map(migrateSection).map(normalizeSectionDefaults);
   }
 
-  const migrated = {
-    ...newsletter,
-    sections: newsletter.sections.map(migrateSection).map(normalizeSectionDefaults),
-  };
+  const hasFooter = sections.some(s => s.type === 'footer');
+  if (!hasFooter) {
+    sections.push({
+      id: `footer-${uid()}`,
+      type: 'footer',
+      backgroundColor: '#FFFFFF',
+      textColor: '#6B7280',
+      textAlign: 'center',
+      paddingTop: 40,
+      paddingBottom: 40,
+      paddingLeft: 24,
+      paddingRight: 24,
+      logo: null,
+      showSocial: true,
+      socialLinks: {},
+      showFooterLinks: true,
+      footerLinks: [
+        { text: 'Unsubscribe', url: '#' },
+        { text: 'Help Center', url: '#' },
+      ],
+      companyName: '',
+      companyAddress: '',
+      copyrightText: '',
+      blocks: [],
+      rows: [createGridRow()],
+    });
+  }
 
-  return migrated;
+  return { ...newsletter, sections };
 }
 
 function normalizeSectionDefaults(section) {

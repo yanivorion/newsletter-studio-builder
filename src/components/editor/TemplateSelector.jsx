@@ -34,6 +34,28 @@ const blankTemplate = {
       spacingTitleToSubtitle: 8,
       showHeroPlaceholder: false,
       height: 350
+    },
+    {
+      id: 'footer-1',
+      type: 'footer',
+      backgroundColor: '#FFFFFF',
+      textColor: '#6B7280',
+      textAlign: 'center',
+      paddingTop: 40,
+      paddingBottom: 40,
+      paddingLeft: 24,
+      paddingRight: 24,
+      logo: null,
+      showSocial: true,
+      socialLinks: {},
+      showFooterLinks: true,
+      footerLinks: [
+        { text: 'Unsubscribe', url: '#' },
+        { text: 'Help Center', url: '#' },
+      ],
+      companyName: '',
+      companyAddress: '',
+      copyrightText: '',
     }
   ]
 };

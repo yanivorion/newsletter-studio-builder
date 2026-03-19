@@ -920,9 +920,9 @@ function exportMultiLayout(block) {
   const borderRadius = block.imageBorderRadius || 12;
   const imgHeight = block.imageHeight || 180;
   const imgGap = block.imageGap ?? 8;
-  const bfs = block.badgeFontSize || 14;
-  const tfs = block.titleFontSize || 13;
-  const dfs = block.bodyFontSize || 13;
+  const bfs = block.badgeFontSize || 16;
+  const tfs = block.titleFontSize || 15;
+  const dfs = block.bodyFontSize || 15;
 
   if (layout === 'track-list') {
     const tracks = block.tracks || [

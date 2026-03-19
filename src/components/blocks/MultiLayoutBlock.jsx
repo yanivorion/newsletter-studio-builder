@@ -180,7 +180,7 @@ const DEFAULT_TRACKS = [
   },
 ];
 
-function TrackListLayout({ badgeText, badgeColor, tracks, badgeFontSize = 14, titleFontSize = 13, bodyFontSize = 13 }) {
+function TrackListLayout({ badgeText, badgeColor, tracks, badgeFontSize = 16, titleFontSize = 15, bodyFontSize = 15 }) {
   const items = tracks && tracks.length > 0 ? tracks : DEFAULT_TRACKS;
   return (
     <div style={{ padding: 0, fontFamily: 'Poppins, sans-serif' }}>
@@ -216,9 +216,9 @@ export default function MultiLayoutBlock({
   images = [],
   imageHeight = 180,
   imageBorderRadius = 12,
-  badgeFontSize = 14,
-  titleFontSize = 13,
-  bodyFontSize = 13,
+  badgeFontSize = 16,
+  titleFontSize = 15,
+  bodyFontSize = 15,
   imageGap = 8,
   tracks,
   onSetLayoutImage,

@@ -155,6 +155,9 @@ function sectionHeightStyle(section) {
 }
 
 function renderSectionHtml(section) {
+  // Footer sections use the dedicated exportFooter renderer
+  if (section.type === 'footer') return null;
+
   const bgStyle = sectionBgStyle(section);
   const hStyle = sectionHeightStyle(section);
   const bgImgRow = sectionBgImageRow(section);
@@ -916,6 +919,7 @@ function exportMultiLayout(block) {
   const layout = block.layout || 'two-col-wide';
   const borderRadius = block.imageBorderRadius || 12;
   const imgHeight = block.imageHeight || 180;
+  const imgGap = block.imageGap ?? 8;
   const bfs = block.badgeFontSize || 14;
   const tfs = block.titleFontSize || 13;
   const dfs = block.bodyFontSize || 13;
@@ -961,9 +965,9 @@ function exportMultiLayout(block) {
       const src = images[imgIdx];
       imgIdx++;
       if (src) {
-        return `<td style="width:${widthPct}%;padding:0 4px 8px 0;vertical-align:top;"><img src="${src}" alt="" style="display:block;width:100%;height:${imgHeight}px;object-fit:cover;border-radius:${borderRadius}px;" /></td>`;
+        return `<td style="width:${widthPct}%;padding:0 4px ${imgGap}px 0;vertical-align:top;"><img src="${src}" alt="" style="display:block;width:100%;height:${imgHeight}px;object-fit:cover;border-radius:${borderRadius}px;" /></td>`;
       }
-      return `<td style="width:${widthPct}%;padding:0 4px 8px 0;vertical-align:top;"><div style="width:100%;height:${imgHeight}px;background:#f4f4f5;border-radius:${borderRadius}px;"></div></td>`;
+      return `<td style="width:${widthPct}%;padding:0 4px ${imgGap}px 0;vertical-align:top;"><div style="width:100%;height:${imgHeight}px;background:#f4f4f5;border-radius:${borderRadius}px;"></div></td>`;
     }).join('');
     return `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr>${cellsHtml}</tr></table>`;
   }).join('');

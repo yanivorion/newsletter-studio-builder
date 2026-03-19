@@ -2351,6 +2351,17 @@ function SidebarEditor({
               onChange={(val) => handleFieldChange('imageBorderRadius', val)}
             />
           </FieldGroup>
+
+          <FieldGroup label="Image to Content Gap">
+            <NumberInput
+              value={block?.imageGap ?? 8}
+              min={0}
+              max={60}
+              step={4}
+              suffix="px"
+              onChange={(val) => handleFieldChange('imageGap', val)}
+            />
+          </FieldGroup>
         </>
       )}
 

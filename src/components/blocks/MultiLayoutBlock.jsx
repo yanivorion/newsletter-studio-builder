@@ -219,6 +219,7 @@ export default function MultiLayoutBlock({
   badgeFontSize = 14,
   titleFontSize = 13,
   bodyFontSize = 13,
+  imageGap = 8,
   tracks,
   onSetLayoutImage,
 }) {
@@ -231,7 +232,7 @@ export default function MultiLayoutBlock({
         display: 'grid',
         gridTemplateColumns: cols.map(c => `${c.span}fr`).join(' '),
         gap: 8,
-        marginBottom: 8,
+        marginBottom: imageGap,
       }}
     >
       {cols.map((col, i) => {

@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { ArrowRight, FolderOpen, Upload, Trash2, FileJson, Sparkles } from 'lucide-react';
 import { createStudio2Template } from '../../lib/templates/studio-2-newsletter';
+import { createSavedTemplate1 } from '../../lib/templates/saved-template-1';
 
 // Blank starter template
 const blankTemplate = {
@@ -339,6 +340,54 @@ function TemplateSelector({
                 </div>
                 <div style={{ fontSize: 12, color: subheadlineColor }}>
                   Hero header, intro text, builder cards, footer
+                </div>
+              </div>
+            </button>
+
+            {/* Saved Template: Builder */}
+            <button
+              onClick={() => onSelectTemplate(createSavedTemplate1())}
+              onMouseEnter={() => setHoveredButton('tpl-builder')}
+              onMouseLeave={() => setHoveredButton(null)}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'stretch',
+                backgroundColor: '#FFFFFF',
+                border: `1px solid ${hoveredButton === 'tpl-builder' ? '#1C1917' : cardBorderColor}`,
+                borderRadius: '12px',
+                overflow: 'hidden',
+                cursor: 'pointer',
+                transition: 'all 200ms ease-out',
+                transform: hoveredButton === 'tpl-builder' ? 'translateY(-2px)' : 'translateY(0)',
+                boxShadow: hoveredButton === 'tpl-builder' ? '0 8px 24px rgba(0,0,0,0.1)' : '0 2px 8px rgba(0,0,0,0.04)',
+                padding: 0,
+                textAlign: 'left',
+              }}
+            >
+              <div style={{
+                height: 160,
+                background: 'linear-gradient(180deg, #FFFFFF 0%, #F5F5F5 100%)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                padding: '16px 20px',
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.06em', color: '#1a1a3e', textTransform: 'uppercase' }}>
+                  BUILDER
+                </div>
+                <hr style={{ width: '60%', border: 'none', borderTop: '1px solid #E5E7EB', margin: '8px 0' }} />
+                <div style={{ fontSize: 11, color: '#6B7280', textAlign: 'center' }}>
+                  3-column layout
+                </div>
+              </div>
+              <div style={{ padding: '16px 20px' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: heroTextColor, marginBottom: 4 }}>
+                  Studio 2.0 — Builder
+                </div>
+                <div style={{ fontSize: 12, color: subheadlineColor }}>
+                  Header, multi-layout section, footer
                 </div>
               </div>
             </button>

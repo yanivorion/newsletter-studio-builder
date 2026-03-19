@@ -44,6 +44,14 @@ function FooterSection({
   logo = null,
   logoWidth = 120,
   logoHeight = 40,
+  showLogo = true,
+  
+  // Tagline (linkable text row below logo)
+  tagline = '',
+  taglineUrl = '',
+  showTagline = true,
+  taglineColor = '#6B7280',
+  taglineFontSize = 13,
   
   // Social links
   socialLinks = {
@@ -95,11 +103,6 @@ function FooterSection({
   sectionGap = 24
 }) {
   const containerStyle = {
-    backgroundColor,
-    paddingTop: `${paddingTop ?? padding}px`,
-    paddingBottom: `${paddingBottom ?? padding}px`,
-    paddingLeft: `${paddingLeft ?? padding}px`,
-    paddingRight: `${paddingRight ?? padding}px`,
     fontFamily: `'${fontFamily}', sans-serif`,
     textAlign
   };
@@ -163,7 +166,7 @@ function FooterSection({
   return (
     <div style={containerStyle}>
       {/* Logo */}
-      {logo && (
+      {showLogo !== false && logo && (
         <div style={{ ...sectionStyle, display: 'flex', justifyContent: textAlign === 'center' ? 'center' : textAlign === 'right' ? 'flex-end' : 'flex-start' }}>
           <img 
             src={logo} 
@@ -174,6 +177,21 @@ function FooterSection({
               objectFit: 'contain'
             }} 
           />
+        </div>
+      )}
+
+      {/* Tagline */}
+      {showTagline !== false && tagline && (
+        <div style={{ ...sectionStyle, marginBottom: `${sectionGap / 2}px` }}>
+          {taglineUrl ? (
+            <a href={taglineUrl} style={{ margin: 0, color: taglineColor, fontSize: `${taglineFontSize}px`, lineHeight: 1.5, textDecoration: 'underline', cursor: 'pointer' }}>
+              {tagline}
+            </a>
+          ) : (
+            <p style={{ margin: 0, color: taglineColor, fontSize: `${taglineFontSize}px`, lineHeight: 1.5 }}>
+              {tagline}
+            </p>
+          )}
         </div>
       )}
 
@@ -201,7 +219,7 @@ function FooterSection({
       )}
 
       {/* Divider */}
-      {showDivider && (showSocial || logo) && <hr style={dividerStyle} />}
+      {showDivider && (showSocial || logo || tagline) && <hr style={dividerStyle} />}
 
       {/* Company Info */}
       {showCompanyInfo && companyInfo && (

@@ -30,24 +30,36 @@ export function migrateNewsletter(newsletter) {
     sections.push({
       id: `footer-${uid()}`,
       type: 'footer',
-      backgroundColor: '#FFFFFF',
+      background: defaultBackground({ color: '#FFFFFF' }),
+      padding: defaultPadding({ top: 40, bottom: 40, left: 24, right: 24 }),
+      height: 'auto',
       textColor: '#6B7280',
       textAlign: 'center',
-      paddingTop: 40,
-      paddingBottom: 40,
-      paddingLeft: 24,
-      paddingRight: 24,
       logo: null,
+      showLogo: true,
+      tagline: '',
+      taglineUrl: '',
+      showTagline: true,
       showSocial: true,
       socialLinks: {},
+      socialIconSize: 24,
+      socialIconColor: '#4B5563',
+      showCompanyInfo: true,
+      companyInfo: 'Wix.com • 40 Namal Tel Aviv St.,Tel Aviv 6350671',
+      companyInfoColor: '#374151',
+      companyInfoFontSize: 14,
+      showDivider: true,
+      dividerColor: '#E5E7EB',
+      dividerWidth: 1,
       showFooterLinks: true,
       footerLinks: [
         { text: 'Unsubscribe', url: '#' },
-        { text: 'Help Center', url: '#' },
+        { text: 'View in Browser', url: '#' },
+        { text: 'Privacy Policy', url: '#' },
       ],
-      companyName: '',
-      companyAddress: '',
-      copyrightText: '',
+      linkColor: '#374151',
+      linkFontSize: 14,
+      fontFamily: 'Poppins',
       blocks: [],
       rows: [createGridRow()],
     });
@@ -86,6 +98,8 @@ function normalizeSectionDefaults(section) {
       };
     }
   }
+
+  if (s.type === 'footer') return s;
 
   if (!isGridSection(s) && Array.isArray(s.blocks) && s.blocks.length > 0) {
     s = { ...s, rows: blocksToRows(s.blocks) };
@@ -180,62 +194,52 @@ function migrateHeader(old) {
 }
 
 function migrateFooter(old) {
-  const blocks = [];
-
-  if (old.logo) {
-    blocks.push(createBlock('logo', {
-      src: old.logo,
-      width: old.logoWidth || 120,
-      height: old.logoHeight || 40,
-    }));
-  }
-
-  if (old.showSocial && old.socialLinks) {
-    blocks.push(createBlock('socialLinks', {
-      links: old.socialLinks,
-      iconSize: old.socialIconSize || 24,
-      iconColor: old.socialIconColor || '#4B5563',
-    }));
-  }
-
-  if (old.showDivider) {
-    blocks.push(createBlock('divider', {
-      color: old.dividerColor || '#E5E7EB',
-    }));
-  }
-
-  if (old.showCompanyInfo && old.companyInfo) {
-    blocks.push(createBlock('companyInfo', {
-      text: old.companyInfo,
-      color: old.companyInfoColor || '#374151',
-      fontSize: old.companyInfoFontSize || 14,
-      align: old.textAlign || 'center',
-    }));
-  }
-
-  if (old.showFooterLinks && old.footerLinks?.length) {
-    blocks.push(createBlock('footerLinks', {
-      links: old.footerLinks,
-      color: old.linkColor || '#374151',
-      fontSize: old.linkFontSize || 14,
-    }));
-  }
-
   return {
     id: old.id || `section-${uid()}`,
     type: 'footer',
     preset: null,
-    background: defaultBackground({ color: old.backgroundColor || '#FFFFFF' }),
-    padding: defaultPadding({
-      top: old.padding ?? 40,
-      bottom: old.padding ?? 40,
-      left: old.padding ?? 40,
-      right: old.padding ?? 40,
-    }),
-    height: 'auto',
+    background: old.background || defaultBackground({ color: old.backgroundColor || '#FFFFFF' }),
+    padding: old.padding && typeof old.padding === 'object' && old.padding.top !== undefined
+      ? old.padding
+      : defaultPadding({
+          top: old.paddingTop ?? old.padding ?? 40,
+          bottom: old.paddingBottom ?? old.padding ?? 40,
+          left: old.paddingLeft ?? old.padding ?? 24,
+          right: old.paddingRight ?? old.padding ?? 24,
+        }),
+    height: old.height || 'auto',
     minHeight: null,
-    blocks,
-    rows: blocksToRows(blocks),
+    // Footer-specific properties (read by FooterSection component)
+    logo: old.logo || null,
+    logoWidth: old.logoWidth || 120,
+    logoHeight: old.logoHeight || 40,
+    showLogo: old.showLogo !== false,
+    tagline: old.tagline || '',
+    taglineUrl: old.taglineUrl || '',
+    showTagline: old.showTagline !== false,
+    taglineColor: old.taglineColor || '#6B7280',
+    taglineFontSize: old.taglineFontSize || 13,
+    socialLinks: old.socialLinks || {},
+    showSocial: old.showSocial !== false,
+    socialIconSize: old.socialIconSize || 24,
+    socialIconColor: old.socialIconColor || '#4B5563',
+    socialGap: old.socialGap || 16,
+    showDivider: old.showDivider !== false,
+    dividerColor: old.dividerColor || '#E5E7EB',
+    dividerWidth: old.dividerWidth || 1,
+    companyInfo: old.companyInfo || '',
+    showCompanyInfo: old.showCompanyInfo !== false,
+    companyInfoColor: old.companyInfoColor || '#374151',
+    companyInfoFontSize: old.companyInfoFontSize || 14,
+    footerLinks: old.footerLinks || [],
+    showFooterLinks: old.showFooterLinks !== false,
+    linkColor: old.linkColor || '#374151',
+    linkFontSize: old.linkFontSize || 14,
+    linkSeparator: old.linkSeparator || '|',
+    textAlign: old.textAlign || 'center',
+    fontFamily: old.fontFamily || 'Poppins',
+    blocks: [],
+    rows: [],
   };
 }
 

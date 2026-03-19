@@ -21,6 +21,7 @@ import BlockRenderer from '../blocks/BlockRenderer';
 import GridRow from './GridRow';
 import GridOverlay from './GridOverlay';
 import { isGridSection } from '../../lib/grid-schema';
+import FooterSection from '../sections/FooterSection';
 
 // Block types shown in the top bar (the ones users commonly add)
 const topBarBlocks = [
@@ -411,8 +412,10 @@ function NewsletterEditor({
             </div>
           )}
 
-          {/* Grid mode: render rows + columns */}
-          {isGridSection(section) ? (
+          {/* Footer sections render the dedicated FooterSection component */}
+          {section.type === 'footer' ? (
+            <FooterSection {...section} />
+          ) : isGridSection(section) ? (
             section.rows.length > 0 ? (
               section.rows.map((row) => (
                 <GridRow

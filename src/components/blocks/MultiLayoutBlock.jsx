@@ -71,6 +71,13 @@ const LAYOUT_PRESETS = {
     textLayout: 'images-then-two-col',
     thumbnail: '/media-kit/layout-two-col-text-side.png',
   },
+  'hero-above': {
+    label: 'Hero Above Badge',
+    images: [{ span: 12 }],
+    textLayout: 'full',
+    imageAboveBadge: true,
+    thumbnail: '/media-kit/layout-hero-above.png',
+  },
   'track-list': {
     label: 'Track List',
     images: [],
@@ -276,9 +283,8 @@ export default function MultiLayoutBlock({
     );
   }
 
-  return (
-    <div style={{ padding: 0, fontFamily: 'Poppins, sans-serif' }}>
-      {/* Badge */}
+  const badgeBlock = (
+    <>
       <div style={{ marginBottom: 8 }}>
         <span
           style={{
@@ -294,6 +300,18 @@ export default function MultiLayoutBlock({
         </span>
       </div>
       <hr style={{ border: 'none', borderTop: '1px solid #E5E7EB', margin: '0 0 12px' }} />
+    </>
+  );
+
+  const heroAboveImages = preset.imageAboveBadge && preset.images && preset.images.length > 0;
+
+  return (
+    <div style={{ padding: 0, fontFamily: 'Poppins, sans-serif' }}>
+      {/* Images above badge (hero-above layout) */}
+      {heroAboveImages && renderImageRow(preset.images)}
+
+      {/* Badge */}
+      {badgeBlock}
 
       {/* Layout content */}
       {preset.textLayout === 'repeat-side' ? (
@@ -341,10 +359,10 @@ export default function MultiLayoutBlock({
       ) : (
         /* Standard: image grid on top, text below */
         <>
-          {preset.imageRows
+          {!heroAboveImages && (preset.imageRows
             ? preset.imageRows.map((row, i) => renderImageRow(row, i))
             : preset.images && preset.images.length > 0 && renderImageRow(preset.images)
-          }
+          )}
           {preset.textLayout === 'centered' ? (
             <div style={{ padding: '8px 0 0', textAlign: 'center' }}>
               <div style={{ fontSize: titleFontSize, fontWeight: 700, letterSpacing: '0.03em', color: '#1C1917', lineHeight: 1.3, marginBottom: 6 }}>{title}</div>

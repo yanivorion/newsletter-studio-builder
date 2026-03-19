@@ -943,6 +943,7 @@ function exportMultiLayout(block) {
 
   const PRESETS = {
     'hero-text':         { rows: [[12]] },
+    'hero-above':        { rows: [[12]], imageAboveBadge: true },
     'two-col-wide':      { rows: [[5, 7]] },
     'three-col':         { rows: [[4, 4, 4]] },
     'two-by-two':        { rows: [[6, 6], [6, 6]] },
@@ -971,10 +972,17 @@ function exportMultiLayout(block) {
     ? `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr><td style="width:42%;vertical-align:top;padding-right:12px;font-size:${tfs}px;font-weight:700;color:#1C1917;letter-spacing:0.03em;line-height:1.3;">${title}</td><td style="width:58%;vertical-align:top;font-size:${dfs}px;color:#6B7280;line-height:1.65;font-family:${fontStack};">${body}</td></tr></table>`
     : `<div style="font-size:${tfs}px;font-weight:700;color:#1C1917;letter-spacing:0.03em;line-height:1.3;margin-bottom:6px;">${title}</div><div style="font-size:${dfs}px;color:#6B7280;line-height:1.65;">${body}</div>`;
 
-  return `
-    <div style="font-family:${fontStack};">
-      <div style="font-size:${bfs}px;font-weight:600;color:${badgeClr};letter-spacing:0.06em;text-transform:uppercase;padding:0 0 4px;">${badge}</div>
-      <hr style="border:none;border-top:1px solid #E5E7EB;margin:0 0 12px;" />
+  const badgeHtml = `<div style="font-size:${bfs}px;font-weight:600;color:${badgeClr};letter-spacing:0.06em;text-transform:uppercase;padding:0 0 4px;">${badge}</div>
+      <hr style="border:none;border-top:1px solid #E5E7EB;margin:0 0 12px;" />`;
+
+  return preset.imageAboveBadge
+    ? `<div style="font-family:${fontStack};">
+      ${imageRowsHtml}
+      ${badgeHtml}
+      <div style="padding:8px 0 0;">${textHtml}</div>
+    </div>`
+    : `<div style="font-family:${fontStack};">
+      ${badgeHtml}
       ${imageRowsHtml}
       <div style="padding:8px 0 0;">${textHtml}</div>
     </div>`;
@@ -983,23 +991,39 @@ function exportMultiLayout(block) {
 function exportFooter(section) {
   const fontStack = getFontStack(section.fontFamily || 'Poppins');
   const textAlign = section.textAlign || 'center';
-  const bgColor = section.backgroundColor || '#FFFFFF';
-  const padding = section.padding || 40;
-  const paddingTop = section.paddingTop ?? padding;
-  const paddingBottom = section.paddingBottom ?? padding;
-  const paddingLeft = section.paddingLeft ?? padding;
-  const paddingRight = section.paddingRight ?? padding;
+  const bg = section.background || {};
+  const bgColor = bg.color || section.backgroundColor || '#FFFFFF';
+  const pad = section.padding && typeof section.padding === 'object' && section.padding.top !== undefined
+    ? section.padding
+    : { top: section.paddingTop ?? section.padding ?? 40, bottom: section.paddingBottom ?? section.padding ?? 40, left: section.paddingLeft ?? section.padding ?? 24, right: section.paddingRight ?? section.padding ?? 24 };
+  const paddingTop = pad.top ?? 40;
+  const paddingBottom = pad.bottom ?? 40;
+  const paddingLeft = pad.left ?? 24;
+  const paddingRight = pad.right ?? 24;
   
   let content = '';
   
-  // Logo - use responsive width
-  if (section.logo) {
+  // Logo
+  if (section.showLogo !== false && section.logo) {
     const logoWidth = section.logoWidth || 120;
     const logoHeight = section.logoHeight || 40;
     content += `
       <tr>
         <td align="${textAlign}" style="padding-bottom: 20px;">
           <img src="${section.logo}" alt="Logo" style="max-width: ${logoWidth}px; height: auto; display: inline-block; object-fit: contain;" />
+        </td>
+      </tr>`;
+  }
+  
+  // Tagline
+  if (section.showTagline !== false && section.tagline) {
+    const tagText = section.taglineUrl
+      ? `<a href="${section.taglineUrl}" style="color: ${section.taglineColor || '#6B7280'}; text-decoration: underline;">${section.tagline}</a>`
+      : section.tagline;
+    content += `
+      <tr>
+        <td align="${textAlign}" style="padding-bottom: 16px; color: ${section.taglineColor || '#6B7280'}; font-family: ${fontStack}; font-size: ${section.taglineFontSize || 13}px; line-height: 1.5;">
+          ${tagText}
         </td>
       </tr>`;
   }

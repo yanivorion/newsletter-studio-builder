@@ -49,6 +49,22 @@ import { LAYOUT_PRESETS } from '../blocks/MultiLayoutBlock';
 
 const REMOVE_BG_API_KEY = 'rDrPT41QWFrheRJc4MARam3m';
 
+function LocalInput({ value, onSave, placeholder, className }) {
+  const [local, setLocal] = useState(value);
+  useEffect(() => { setLocal(value); }, [value]);
+  return (
+    <input
+      type="text"
+      value={local}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={() => { if (local !== value) onSave(local); }}
+      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (local !== value) onSave(local); } }}
+      placeholder={placeholder}
+      className={className}
+    />
+  );
+}
+
 // Uncontrolled color picker component - uses refs to avoid focus issues
 function ImageColorPicker({ value, onChange, placeholder = 'Enter color', allowClear = false }) {
   const textRef = useRef(null);
@@ -2196,31 +2212,37 @@ function SidebarEditor({
       </FieldGroup>
 
       <FieldGroup label="Font Sizes">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-          <div>
-            <label className="text-[10px] text-zinc-400 mb-1 block">Badge</label>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-zinc-400 w-10 flex-shrink-0">Badge</span>
             <NumberInput
               value={block?.badgeFontSize || 14}
               min={8}
               max={32}
+              step={1}
+              suffix="px"
               onChange={(val) => handleFieldChange('badgeFontSize', val)}
             />
           </div>
-          <div>
-            <label className="text-[10px] text-zinc-400 mb-1 block">Title</label>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-zinc-400 w-10 flex-shrink-0">Title</span>
             <NumberInput
               value={block?.titleFontSize || 13}
               min={8}
               max={48}
+              step={1}
+              suffix="px"
               onChange={(val) => handleFieldChange('titleFontSize', val)}
             />
           </div>
-          <div>
-            <label className="text-[10px] text-zinc-400 mb-1 block">Body</label>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-zinc-400 w-10 flex-shrink-0">Body</span>
             <NumberInput
               value={block?.bodyFontSize || 13}
               min={8}
               max={32}
+              step={1}
+              suffix="px"
               onChange={(val) => handleFieldChange('bodyFontSize', val)}
             />
           </div>
@@ -2389,30 +2411,105 @@ function SidebarEditor({
         
         {/* Logo */}
         <FieldGroup label="Logo">
-          <ImageUploader
-            currentImage={section.logo}
-            onImageUpload={(file) => handleImageUpload(file, 'logo')}
-            className="h-24"
-          />
-          {section.logo && (
-            <div className="grid grid-cols-2 gap-2 mt-2">
+          <label className="flex items-center gap-2 text-xs text-zinc-600 cursor-pointer mb-2">
+            <input
+              type="checkbox"
+              checked={section.showLogo !== false}
+              onChange={(e) => handleFieldChange('showLogo', e.target.checked)}
+              className="rounded border-zinc-300 text-[#04D1FC] focus:ring-[#04D1FC]"
+            />
+            Show logo
+          </label>
+          {section.showLogo !== false && (
+            <>
+              <ImageUploader
+                currentImage={section.logo}
+                onImageUpload={(file) => handleImageUpload(file, 'logo')}
+                className="h-24"
+              />
+              {section.logo && (
+                <>
+                  <button
+                    onClick={() => handleFieldChange('logo', null)}
+                    className="w-full mt-1 h-7 text-[10px] text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 border border-red-100 rounded-md transition-colors"
+                  >
+                    Remove logo
+                  </button>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <div className="space-y-1">
+                      <span className="text-[9px] text-zinc-400">Width</span>
+                      <NumberInput
+                        value={section.logoWidth || 120}
+                        onChange={(val) => handleFieldChange('logoWidth', val)}
+                        suffix="px"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[9px] text-zinc-400">Height</span>
+                      <NumberInput
+                        value={section.logoHeight || 40}
+                        onChange={(val) => handleFieldChange('logoHeight', val)}
+                        suffix="px"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </FieldGroup>
+
+        {/* Tagline */}
+        <FieldGroup label="Tagline">
+          <label className="flex items-center gap-2 text-xs text-zinc-600 cursor-pointer mb-2">
+            <input
+              type="checkbox"
+              checked={section.showTagline !== false}
+              onChange={(e) => handleFieldChange('showTagline', e.target.checked)}
+              className="rounded border-zinc-300 text-[#04D1FC] focus:ring-[#04D1FC]"
+            />
+            Show tagline
+          </label>
+          {section.showTagline !== false && (
+            <>
               <div className="space-y-1">
-                <span className="text-[9px] text-zinc-400">Width</span>
-                <NumberInput
-                  value={section.logoWidth || 120}
-                  onChange={(val) => handleFieldChange('logoWidth', val)}
-                  suffix="px"
+                <span className="text-[9px] text-zinc-400">Text</span>
+                <LocalInput
+                  value={section.tagline || ''}
+                  onSave={(val) => handleFieldChange('tagline', val)}
+                  placeholder="e.g. Your weekly dose of inspiration"
+                  className="w-full h-8 px-2 text-xs rounded border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#04D1FC] focus:border-transparent"
                 />
               </div>
               <div className="space-y-1">
-                <span className="text-[9px] text-zinc-400">Height</span>
-                <NumberInput
-                  value={section.logoHeight || 40}
-                  onChange={(val) => handleFieldChange('logoHeight', val)}
-                  suffix="px"
+                <span className="text-[9px] text-zinc-400">Link URL (optional)</span>
+                <LocalInput
+                  value={section.taglineUrl || ''}
+                  onSave={(val) => handleFieldChange('taglineUrl', val)}
+                  placeholder="https://..."
+                  className="w-full h-8 px-2 text-xs rounded border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#04D1FC] focus:border-transparent"
                 />
               </div>
-            </div>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <div className="space-y-1">
+                  <span className="text-[9px] text-zinc-400">Font Size</span>
+                  <NumberInput
+                    value={section.taglineFontSize || 13}
+                    onChange={(val) => handleFieldChange('taglineFontSize', val)}
+                    suffix="px"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[9px] text-zinc-400">Color</span>
+                  <input
+                    type="color"
+                    value={section.taglineColor || '#6B7280'}
+                    onChange={(e) => handleFieldChange('taglineColor', e.target.value)}
+                    className="w-full h-8 rounded border border-zinc-200 cursor-pointer"
+                  />
+                </div>
+              </div>
+            </>
           )}
         </FieldGroup>
 
@@ -2429,18 +2526,28 @@ function SidebarEditor({
           </label>
           {section.showSocial !== false && (
             <div className="space-y-2">
-              {['facebook', 'x', 'linkedin', 'instagram', 'youtube', 'tiktok', 'rss'].map(platform => (
-                <div key={platform} className="flex items-center gap-2">
-                  <span className="text-[10px] text-zinc-500 w-16 capitalize">{platform}</span>
-                  <input
-                    type="text"
-                    defaultValue={socialLinks[platform] || ''}
-                    onBlur={(e) => handleSocialLinkChange(platform, e.target.value)}
-                    placeholder="URL or #"
-                    className="flex-1 h-8 px-2 text-xs rounded border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-[#04D1FC]"
-                  />
-                </div>
-              ))}
+              {['facebook', 'x', 'linkedin', 'instagram', 'youtube', 'tiktok', 'rss'].map(platform => {
+                const hasUrl = !!(socialLinks[platform]);
+                return (
+                  <div key={platform} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={hasUrl}
+                      onChange={(e) => handleSocialLinkChange(platform, e.target.checked ? '#' : '')}
+                      className="rounded border-zinc-300 text-[#04D1FC] focus:ring-[#04D1FC] flex-shrink-0"
+                    />
+                    <span className="text-[10px] text-zinc-500 w-14 capitalize">{platform}</span>
+                    {hasUrl && (
+                      <LocalInput
+                        value={socialLinks[platform]}
+                        onSave={(val) => handleSocialLinkChange(platform, val)}
+                        placeholder="URL"
+                        className="flex-1 h-7 px-2 text-xs rounded border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-[#04D1FC]"
+                      />
+                    )}
+                  </div>
+                );
+              })}
               <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-zinc-100">
                 <div className="space-y-1">
                   <span className="text-[9px] text-zinc-400">Icon Size</span>
@@ -2522,27 +2629,28 @@ function SidebarEditor({
           {section.showFooterLinks !== false && (
             <div className="space-y-2">
               {footerLinks.map((link, index) => (
-                <div key={index} className="flex gap-1 items-center">
-                  <input
-                    type="text"
-                    defaultValue={link.text}
-                    onBlur={(e) => handleFooterLinkChange(index, 'text', e.target.value)}
-                    placeholder="Text"
-                    className="flex-1 h-8 px-2 text-xs rounded border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-[#04D1FC]"
+                <div key={index} className="space-y-1 p-2 bg-zinc-50 rounded-md border border-zinc-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] text-zinc-400 font-medium">Link {index + 1}</span>
+                    <button
+                      onClick={() => removeFooterLink(index)}
+                      className="w-5 h-5 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <LocalInput
+                    value={link.text || ''}
+                    onSave={(val) => handleFooterLinkChange(index, 'text', val)}
+                    placeholder="Label text"
+                    className="w-full h-7 px-2 text-xs rounded border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#04D1FC]"
                   />
-                  <input
-                    type="text"
-                    defaultValue={link.url}
-                    onBlur={(e) => handleFooterLinkChange(index, 'url', e.target.value)}
-                    placeholder="URL"
-                    className="flex-1 h-8 px-2 text-xs rounded border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-[#04D1FC]"
+                  <LocalInput
+                    value={link.url || ''}
+                    onSave={(val) => handleFooterLinkChange(index, 'url', val)}
+                    placeholder="https://..."
+                    className="w-full h-7 px-2 text-xs rounded border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#04D1FC]"
                   />
-                  <button
-                    onClick={() => removeFooterLink(index)}
-                    className="w-8 h-8 flex items-center justify-center text-red-500 hover:bg-red-50 rounded"
-                  >
-                    ×
-                  </button>
                 </div>
               ))}
               <Button variant="outline" size="sm" onClick={addFooterLink} className="w-full text-xs">
@@ -2781,22 +2889,9 @@ function SidebarEditor({
                     </label>
                   )
                 ) : (
-                  <input
-                    type="text"
-                    defaultValue={item.value || ''}
-                    onBlur={(e) => {
-                      if (e.target.value !== (item.value || '')) {
-                        updateItemAt(i, { value: e.target.value });
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        if (e.target.value !== (item.value || '')) {
-                          updateItemAt(i, { value: e.target.value });
-                        }
-                      }
-                    }}
+                  <LocalInput
+                    value={item.value || ''}
+                    onSave={(val) => updateItemAt(i, { value: val })}
                     placeholder="Enter text..."
                     className="w-full h-7 px-2 text-xs rounded border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#04D1FC] focus:border-transparent"
                   />
@@ -3730,6 +3825,7 @@ function SidebarEditor({
   const renderEditor = () => {
     if (!section) return null;
     if (block) return renderBlockEditor();
+    if (parentSection && parentSection.type === 'footer') return renderFooterEditor();
     return renderSectionSettingsEditor();
   };
 

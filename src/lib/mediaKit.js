@@ -87,6 +87,12 @@ export const mediaKit = {
       category: 'cover'
     },
     {
+      id: 'cover-6',
+      name: 'Cover — Wix Studio',
+      url: '/media-kit/cover-6.png',
+      category: 'cover'
+    },
+    {
       id: 'cover-nologo-1',
       name: 'Cover No Logo — 1',
       url: '/media-kit/cover-nologo-1.png',

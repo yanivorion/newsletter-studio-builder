@@ -1,0 +1,283 @@
+/**
+ * Newsletter Conversion Pipeline
+ *
+ * Converts dynamic/animated blocks (marquee, imageSequence) into
+ * email-safe images so the newsletter renders correctly in Gmail.
+ *
+ * - Marquee → animated GIF (preserves scrolling animation)
+ * - ImageSequence → static PNG screenshot
+ *
+ * Flow:
+ *   1. Walk all blocks and identify dynamic types
+ *   2. For marquee: generate animated GIF via canvas + server-side encoding
+ *      For others: screenshot via html2canvas
+ *   3. Upload to Supabase via /api/images/upload
+ *   4. Clone the newsletter data, replacing dynamic blocks with image blocks
+ *   5. Return the email-ready newsletter
+ */
+
+import { exportMarqueeAsGif } from './sequenceGifExport';
+
+const DYNAMIC_BLOCK_TYPES = ['marquee', 'imageSequence'];
+
+// ---------------------------------------------------------------------------
+// 1. Find all dynamic blocks across flat-blocks and grid modes
+// ---------------------------------------------------------------------------
+
+export function findDynamicBlocks(newsletter) {
+  const seen = new Set();
+  const results = [];
+
+  for (const section of newsletter.sections || []) {
+    const collect = (blocks) => {
+      for (const block of blocks || []) {
+        if (DYNAMIC_BLOCK_TYPES.includes(block.type) && !seen.has(block.id)) {
+          seen.add(block.id);
+          results.push({ blockId: block.id, block, sectionId: section.id });
+        }
+      }
+    };
+
+    if (Array.isArray(section.rows)) {
+      for (const row of section.rows) {
+        for (const col of row.columns || []) {
+          collect(col.blocks);
+        }
+      }
+    }
+
+    collect(section.blocks);
+  }
+
+  return results;
+}
+
+// ---------------------------------------------------------------------------
+// 2. Deep-clone newsletter and swap blocks by id
+// ---------------------------------------------------------------------------
+
+function replaceBlocks(newsletter, replacements) {
+  const clone = JSON.parse(JSON.stringify(newsletter));
+  const swap = (blocks) => (blocks || []).map((b) => replacements[b.id] || b);
+
+  for (const section of clone.sections) {
+    if (Array.isArray(section.rows)) {
+      for (const row of section.rows) {
+        for (const col of row.columns) {
+          col.blocks = swap(col.blocks);
+        }
+      }
+    }
+    if (Array.isArray(section.blocks)) {
+      section.blocks = swap(section.blocks);
+    }
+  }
+
+  return clone;
+}
+
+// ---------------------------------------------------------------------------
+// 3. Screenshot a block element from the live DOM
+// ---------------------------------------------------------------------------
+
+async function captureBlockAsImage(blockId) {
+  const html2canvas = (await import('html2canvas')).default;
+
+  const wrapper = document.querySelector(`[data-block-id="${blockId}"]`);
+  if (!wrapper) throw new Error(`Block element not found in DOM: ${blockId}`);
+
+  const contentEl = wrapper.firstElementChild || wrapper;
+
+  // ── Temporarily clean up the element for a pristine capture ──
+
+  const savedOutline = wrapper.style.outline;
+  const savedOutlineOffset = wrapper.style.outlineOffset;
+  wrapper.style.outline = 'none';
+  wrapper.style.outlineOffset = '0';
+
+  // Pause every CSS animation inside the block so html2canvas gets a
+  // stable frame instead of a mid-transition snapshot.
+  const paused = [];
+  contentEl.querySelectorAll('*').forEach((el) => {
+    const cs = window.getComputedStyle(el);
+    if (cs.animationName && cs.animationName !== 'none') {
+      paused.push({
+        el,
+        animation: el.style.animation,
+        playState: el.style.animationPlayState,
+      });
+      el.style.animationPlayState = 'paused';
+    }
+  });
+
+  // Let the browser settle after style changes
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  const rect = contentEl.getBoundingClientRect();
+
+  const canvas = await html2canvas(contentEl, {
+    backgroundColor: null,
+    scale: 2,
+    useCORS: true,
+    allowTaint: true,
+    logging: false,
+  });
+
+  // ── Restore everything ──
+  wrapper.style.outline = savedOutline;
+  wrapper.style.outlineOffset = savedOutlineOffset;
+  paused.forEach(({ el, animation, playState }) => {
+    el.style.animation = animation;
+    el.style.animationPlayState = playState;
+  });
+
+  return {
+    dataUrl: canvas.toDataURL('image/png'),
+    width: Math.round(rect.width),
+    height: Math.round(rect.height),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 4. Upload a data-URL image via the existing API
+// ---------------------------------------------------------------------------
+
+async function uploadCapturedImage(dataUrl, userId) {
+  const res = await fetch('/api/images/upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      base64: dataUrl,
+      userId: userId || 'public',
+      folder: 'newsletters/converted',
+      format: 'png',
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Upload failed (${res.status})`);
+  }
+
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// 5. Main entry point
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert a newsletter for email delivery.
+ *
+ * - Scans for dynamic blocks (marquee, imageSequence)
+ * - Screenshots each from the DOM
+ * - Uploads as hosted PNG
+ * - Returns a new newsletter object with those blocks replaced by images
+ *
+ * The original newsletter is NOT mutated.
+ *
+ * @param {object}   newsletter        The current newsletter state
+ * @param {object}   options
+ * @param {string}   options.userId     Supabase user id for storage paths
+ * @param {function} options.onProgress Called with { step, current, total, label }
+ * @returns {{ newsletter, converted: boolean, count: number }}
+ */
+export async function convertNewsletterForEmail(newsletter, options = {}) {
+  const { userId, onProgress } = options;
+
+  const dynamicBlocks = findDynamicBlocks(newsletter);
+
+  if (dynamicBlocks.length === 0) {
+    return { newsletter, converted: false, count: 0 };
+  }
+
+  const replacements = {};
+  const total = dynamicBlocks.length;
+
+  for (let i = 0; i < total; i++) {
+    const { blockId, block } = dynamicBlocks[i];
+    const label = block.type === 'marquee' ? 'Marquee' : 'Image Sequence';
+
+    onProgress?.({ step: 'capture', current: i + 1, total, label });
+
+    try {
+      let uploaded;
+
+      if (block.type === 'marquee') {
+        let gifResult = null;
+        try {
+          gifResult = await exportMarqueeAsGif(block, { width: 700 });
+        } catch (gifErr) {
+          console.warn(`GIF generation failed for marquee (${blockId}), falling back to screenshot:`, gifErr.message);
+        }
+
+        onProgress?.({ step: 'upload', current: i + 1, total, label });
+
+        if (gifResult?.blob) {
+          const formData = new FormData();
+          formData.append('file', gifResult.blob, `marquee-${Date.now()}.gif`);
+          const res = await fetch('/api/images/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+          uploaded = await res.json();
+
+          replacements[blockId] = {
+            type: 'image',
+            id: blockId,
+            src: uploaded.url,
+            alt: 'Marquee animation',
+            borderRadius: 0,
+            _convertedFrom: 'marquee',
+            _originalHeight: gifResult.height,
+          };
+        } else {
+          // Fallback: screenshot the live DOM element as a static image
+          const capture = await captureBlockAsImage(blockId);
+          uploaded = await uploadCapturedImage(capture.dataUrl, userId);
+
+          replacements[blockId] = {
+            type: 'image',
+            id: blockId,
+            src: uploaded.url,
+            alt: 'Marquee content',
+            borderRadius: 0,
+            _convertedFrom: 'marquee',
+            _originalHeight: capture.height,
+          };
+        }
+      } else {
+        const capture = await captureBlockAsImage(blockId);
+        onProgress?.({ step: 'upload', current: i + 1, total, label });
+        uploaded = await uploadCapturedImage(capture.dataUrl, userId);
+
+        replacements[blockId] = {
+          type: 'image',
+          id: blockId,
+          src: uploaded.url,
+          alt: `${label} content`,
+          borderRadius: 0,
+          _convertedFrom: block.type,
+          _originalHeight: capture.height,
+        };
+      }
+    } catch (err) {
+      console.error(`Conversion failed for ${label} (${blockId}):`, err);
+      onProgress?.({
+        step: 'error',
+        current: i + 1,
+        total,
+        label,
+        error: err.message,
+      });
+    }
+  }
+
+  const converted = replaceBlocks(newsletter, replacements);
+  const count = Object.keys(replacements).length;
+
+  onProgress?.({ step: 'done', count, total });
+
+  return { newsletter: converted, converted: true, count };
+}

@@ -1,0 +1,12 @@
+var R=require("../../../../chunks/[turbopack]_runtime.js")("server/app/api/email/send/route.js")
+R.c("server/chunks/[root-of-the-server]__b88a75e2._.js")
+R.c("server/chunks/7e03e_Studio 2_0 Newsletter_newsletter-platform_src_lib_mjml-renderer_bdbbf1ac.js")
+R.c("server/chunks/[root-of-the-server]__3659f3c2._.js")
+R.c("server/chunks/59e73_@aws-sdk_core_dist-es_submodules_protocols_json_AwsRestJsonProtocol_b05890ef.js")
+R.c("server/chunks/Desktop_Projects_Studio 2_0 Newsletter_newsletter-platform_acc436e2._.js")
+R.c("server/chunks/7e03e_Studio 2_0 Newsletter_newsletter-platform_src_lib_supabase-client_b977673a.js")
+R.c("server/chunks/[root-of-the-server]__1a01901a._.js")
+R.c("server/chunks/[root-of-the-server]__7d82c274._.js")
+R.c("server/chunks/7699a__next-internal_server_app_api_email_send_route_actions_f48dbb91.js")
+R.m(14131)
+module.exports=R.m(14131).exports

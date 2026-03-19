@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import { X } from 'lucide-react';
 import MediaKitPanel from './MediaKitPanel';
 
-function FloatingMediaModal({ open, onClose, onSelectLogo, onBulkUpload, anchorRect }) {
+function FloatingMediaModal({ open, onClose, onSelectLogo, onBulkUpload, anchorRect, userId }) {
   const modalRef = useRef(null);
 
   const handleClickOutside = useCallback((e) => {
@@ -63,7 +63,7 @@ function FloatingMediaModal({ open, onClose, onSelectLogo, onBulkUpload, anchorR
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
-      <MediaKitPanel onSelectLogo={onSelectLogo} onBulkUpload={onBulkUpload} />
+      <MediaKitPanel onSelectLogo={onSelectLogo} onBulkUpload={onBulkUpload} userId={userId} />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 // Email-compatible HTML export - Minified for smaller size
+import { linksToHTML } from '../lib/textUtils';
 
 // Google Fonts URL (shorter - only essential weights)
 const GOOGLE_FONTS_URL = 'https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;600;700&family=Poppins:wght@400;500;600;700&display=swap';
@@ -72,22 +73,34 @@ function wrapWithContainer(content, container) {
 
 // Shared helpers (used by both exportToHTML and exportForGmail)
 
+function wrapLegacyRowAsBlock(html) {
+  if (!html) return '';
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="table-layout:fixed;">${html}</table>`;
+}
+
 function blockToHtml(block) {
   switch (block.type) {
-    case 'text': return exportText(block);
+    case 'text': {
+      const dirAttr = block.direction === 'rtl' ? ' dir="rtl"' : '';
+      const content = linksToHTML((block.content || '')).replace(/\n/g, '<br>');
+      const fontStack = getFontStack(block.fontFamily || 'Poppins');
+      return `<div${dirAttr} style="font-family:${fontStack};font-size:${block.fontSize || 16}px;color:${block.color || '#333333'};text-align:${block.textAlign || 'center'};line-height:${block.lineHeight || 1.6};padding:${block.padding || 0}px 0;">${content}</div>`;
+    }
     case 'title': {
+      const titleText = block.text || '';
+      const wrapLink = (inner) => block.link ? `<a href="${block.link}" style="color:inherit;text-decoration:none;">${inner}</a>` : inner;
       if (block.backgroundColor) {
         const chevron = block.showChevron ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.25);color:${block.color || '#FFFFFF'};font-size:16px;">&#8250;</span>` : '';
-        return `<div style="padding:4px 0;text-align:${block.textAlign || 'left'};"><div style="display:inline-flex;align-items:center;justify-content:space-between;width:${block.maxWidth || '100%'};box-sizing:border-box;padding:${block.padding || 10}px ${(block.padding || 10) + 8}px;background:${block.backgroundColor};border-radius:${block.borderRadius || 24}px;"><span style="font-size:${block.fontSize || 14}px;font-weight:${block.fontWeight || 600};color:${block.color || '#FFFFFF'};letter-spacing:${block.letterSpacing || '0.06em'};font-style:${block.fontStyle || 'normal'};">${block.text || ''}</span>${chevron}</div></div>`;
+        return `<div style="padding:4px 0;text-align:${block.textAlign || 'left'};">${wrapLink(`<div style="display:inline-flex;align-items:center;justify-content:space-between;width:${block.maxWidth || '100%'};box-sizing:border-box;padding:${block.padding || 10}px ${(block.padding || 10) + 8}px;background:${block.backgroundColor};border-radius:${block.borderRadius || 24}px;"><span style="font-size:${block.fontSize || 14}px;font-weight:${block.fontWeight || 600};color:${block.color || '#FFFFFF'};letter-spacing:${block.letterSpacing || '0.06em'};font-style:${block.fontStyle || 'normal'};">${titleText}</span>${chevron}</div>`)}</div>`;
       }
-      return `<div style="padding:${block.padding || 0}px 0;text-align:${block.textAlign || 'center'};"><h2 style="margin:0;font-size:${block.fontSize || 18}px;font-weight:${block.fontWeight || 700};color:${block.color || '#FFFFFF'};letter-spacing:${block.letterSpacing || '0.1em'};line-height:${block.lineHeight || 1.2};font-style:${block.fontStyle || 'normal'};">${block.text || ''}</h2></div>`;
+      return `<div style="padding:${block.padding || 0}px 0;text-align:${block.textAlign || 'center'};"><h2 style="margin:0;font-size:${block.fontSize || 18}px;font-weight:${block.fontWeight || 700};color:${block.color || '#FFFFFF'};letter-spacing:${block.letterSpacing || '0.1em'};line-height:${block.lineHeight || 1.2};font-style:${block.fontStyle || 'normal'};">${wrapLink(titleText)}</h2></div>`;
     }
-    case 'marquee': return exportMarquee(block);
-    case 'promoCard': return exportPromoCard(block);
+    case 'marquee': return wrapLegacyRowAsBlock(exportMarquee(block));
+    case 'promoCard': return wrapLegacyRowAsBlock(exportPromoCard(block));
     case 'multiLayout': return exportMultiLayout(block);
-    case 'imageCollage': return exportImageCollage(block);
-    case 'profileCards': return exportProfileCards(block);
-    case 'recipe': return exportRecipe(block);
+    case 'imageCollage': return wrapLegacyRowAsBlock(exportImageCollage(block));
+    case 'profileCards': return wrapLegacyRowAsBlock(exportProfileCards(block));
+    case 'recipe': return wrapLegacyRowAsBlock(exportRecipe(block));
     case 'logo': {
       if (block.rightText) {
         return `<table width="100%" cellpadding="0" cellspacing="0" style="padding:8px 0;"><tr><td style="text-align:left;">${block.src ? `<img src="${block.src}" alt="Logo" width="${block.width || 120}" style="display:inline-block;" />` : ''}</td><td style="text-align:right;font-size:${block.rightTextFontSize || 11}px;font-weight:${block.rightTextFontWeight || 500};color:${block.rightTextColor || '#FFFFFF'};letter-spacing:${block.rightTextLetterSpacing || '0.05em'};text-transform:uppercase;font-family:Poppins,Arial,sans-serif;">${block.rightText}</td></tr></table>`;
@@ -191,6 +204,109 @@ function renderSectionHtml(section) {
   }
 
   return null;
+}
+
+/**
+ * Resolve all relative image URLs in a newsletter by uploading
+ * them to Supabase. Call this before exportToHTML/exportForGmail
+ * to ensure the HTML works outside the app.
+ *
+ * Returns a deep clone with all /paths replaced by hosted URLs.
+ */
+export async function resolveNewsletterImages(newsletter, userId) {
+  if (!newsletter?.sections) return newsletter;
+
+  const clone = JSON.parse(JSON.stringify(newsletter));
+  const uploadCache = {};
+
+  async function resolve(url) {
+    if (!url || typeof url !== 'string') return url;
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+    if (!url.startsWith('/')) return url;
+
+    if (uploadCache[url]) return uploadCache[url];
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Fetch ${url} failed`);
+      const blob = await res.blob();
+      const ext = url.split('.').pop().split('?')[0] || 'png';
+      const filename = `asset-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+
+      const formData = new FormData();
+      formData.append('file', blob, filename);
+      formData.append('userId', userId || 'public');
+      formData.append('folder', 'newsletters/exported-assets');
+
+      const uploadRes = await fetch('/api/images/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!uploadRes.ok) throw new Error('Upload failed');
+      const data = await uploadRes.json();
+      uploadCache[url] = data.url;
+      return data.url;
+    } catch (err) {
+      console.warn(`Failed to resolve image ${url}:`, err.message);
+      return url;
+    }
+  }
+
+  async function processBlock(block) {
+    if (!block) return;
+    if (block.src) block.src = await resolve(block.src);
+    if (block.image) block.image = await resolve(block.image);
+    if (block.heroImage) block.heroImage = await resolve(block.heroImage);
+    if (block.logo) block.logo = await resolve(block.logo);
+    if (block.gifUrl) block.gifUrl = await resolve(block.gifUrl);
+    if (Array.isArray(block.images)) {
+      for (let i = 0; i < block.images.length; i++) {
+        block.images[i] = await resolve(block.images[i]);
+      }
+    }
+    if (Array.isArray(block.items)) {
+      for (const item of block.items) {
+        if (item.type === 'image' && item.src) {
+          item.src = await resolve(item.src);
+        }
+      }
+    }
+    if (Array.isArray(block.profiles)) {
+      for (const p of block.profiles) {
+        if (p.image) p.image = await resolve(p.image);
+      }
+    }
+  }
+
+  for (const section of clone.sections) {
+    if (section.logo) section.logo = await resolve(section.logo);
+    if (section.heroImage) section.heroImage = await resolve(section.heroImage);
+    if (section.image) section.image = await resolve(section.image);
+    if (section.gifUrl) section.gifUrl = await resolve(section.gifUrl);
+
+    if (section.container?.backgroundImage) {
+      section.container.backgroundImage = await resolve(section.container.backgroundImage);
+    }
+
+    if (Array.isArray(section.rows)) {
+      for (const row of section.rows) {
+        for (const col of row.columns || []) {
+          for (const block of col.blocks || []) {
+            await processBlock(block);
+          }
+        }
+      }
+    }
+    if (Array.isArray(section.blocks)) {
+      for (const block of section.blocks) {
+        await processBlock(block);
+      }
+    }
+
+    await processBlock(section);
+  }
+
+  return clone;
 }
 
 export function exportToHTML(newsletter) {
@@ -389,8 +505,8 @@ export function exportForGmail(newsletter) {
   // Build inner container style
   const innerContainerStyle = `background-color: ${innerBg};${innerBorderWidth > 0 ? ` border: ${innerBorderWidth}px solid ${innerBorderColor};` : ''}${innerBorderRadius > 0 ? ` border-radius: ${innerBorderRadius}px;` : ''} overflow: hidden;`;
 
-  // For Gmail - 700px wrapper with inner table (no visible outer background)
-  const html = `<div style="max-width:700px;width:700px;margin:0 auto;font-family:${FONT_STACKS['default']};"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:${innerBg};width:100%;table-layout:fixed;${innerBorderWidth > 0 ? `border:${innerBorderWidth}px solid ${innerBorderColor};` : ''}${innerBorderRadius > 0 ? `border-radius:${innerBorderRadius}px;` : ''}overflow:hidden;">${sections}</table></div>`;
+  // For Gmail - full-width outer frame with centered inner table
+  const html = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="font-family:${FONT_STACKS['default']};"><tr><td align="center" style="background-color:${outerBg};padding:${outerPadding}px;"><table role="presentation" width="700" cellspacing="0" cellpadding="0" border="0" style="${innerContainerStyle}width:700px;table-layout:fixed;">${sections}</table></td></tr></table>`;
   
   return minifyHTML(html);
 }
@@ -457,7 +573,7 @@ function exportHeader(section, isGmail = false) {
           <tr>
             <td align="center" style="padding: 0 20px ${section.showDateBadge ? '20px' : '40px'};">
               <h1 style="margin: 0 0 10px; font-size: ${titleFontSize}px; font-weight: ${titleFontWeight}; font-style: ${titleFontStyle}; letter-spacing: ${titleLetterSpacing}; font-family: ${fontStack}; line-height: ${titleLineHeight}; color: ${textColor};">
-                ${section.title || ''}
+                ${linksToHTML(section.title || '')}
               </h1>
               ${section.subtitle ? `<p style="margin: 0; font-size: ${subtitleFontSize}px; font-weight: ${subtitleFontWeight}; opacity: 0.95; font-family: ${fontStack}; line-height: 1.4; color: ${textColor};">${section.subtitle}</p>` : ''}
             </td>
@@ -502,7 +618,7 @@ function exportMarquee(section) {
 
 function exportText(section) {
   const dirAttr = section.direction === 'rtl' ? 'dir="rtl"' : '';
-  const content = (section.content || '').replace(/\n/g, '<br>');
+  const content = linksToHTML((section.content || '')).replace(/\n/g, '<br>');
   const fontFamily = section.fontFamily || 'Poppins';
   const fontStack = getFontStack(fontFamily);
   
@@ -557,7 +673,7 @@ function exportAccentText(section) {
   const paddingRight = section.paddingRight ?? padding;
   const tagToContentGap = section.tagToContentGap ?? 40;
   
-  const content = (section.content || '').replace(/\n\n/g, '</p><p style="margin: 0 0 1em;">').replace(/\n/g, '<br>');
+  const content = linksToHTML((section.content || '')).replace(/\n\n/g, '</p><p style="margin: 0 0 1em;">').replace(/\n/g, '<br>');
   
   // Tag badge - use nested table for proper centering
   const tagAlign = section.tagPosition === 'top-left' ? 'left' : 'right';
@@ -603,7 +719,7 @@ function exportPromoCard(section, isGmail = false) {
   const bodyToCtaGap = section.bodyToCtaGap ?? 20;
   const gap = section.gap || 24;
   
-  const body = (section.body || '').replace(/\n\n/g, '</p><p style="margin: 0.8em 0 0;">').replace(/\n/g, '<br>');
+  const body = linksToHTML((section.body || '')).replace(/\n\n/g, '</p><p style="margin: 0.8em 0 0;">').replace(/\n/g, '<br>');
   
   // Image dimensions - fixed size with object-fit cover
   const imageWidth = section.imageWidth || 200;
@@ -627,7 +743,7 @@ function exportPromoCard(section, isGmail = false) {
   const contentCell = `
     <td valign="${section.verticalAlign || 'middle'}" style="vertical-align: ${section.verticalAlign || 'middle'}; text-align: ${textAlign};">
       <h3 style="margin: 0 0 ${titleToBodyGap}px; font-family: ${fontStack}; font-size: ${section.titleFontSize || 28}px; font-weight: ${section.titleFontWeight || 700}; color: ${section.titleColor || '#1A1A1A'}; line-height: 1.3;">
-        ${section.title || 'Card Title'}
+        ${linksToHTML(section.title || 'Card Title')}
       </h3>
       <div style="font-family: ${fontStack}; font-size: ${section.bodyFontSize || 16}px; line-height: ${section.bodyLineHeight || 1.7}; color: ${section.bodyColor || '#555555'}; margin-bottom: ${section.showCta !== false ? bodyToCtaGap + 'px' : '0'};">
         <p style="margin: 0;">${body}</p>
@@ -913,8 +1029,8 @@ function exportMultiLayout(block) {
   const fontStack = FONT_STACKS['default'];
   const badge = block.badgeText || 'BUILDER';
   const badgeClr = block.badgeColor || '#1a1a3e';
-  const title = block.title || '';
-  const body = (block.body || '').replace(/\n/g, '<br>');
+  const title = linksToHTML(block.title || '');
+  const body = linksToHTML((block.body || '')).replace(/\n/g, '<br>');
   const images = block.images || [];
   const layout = block.layout || 'two-col-wide';
   const borderRadius = block.imageBorderRadius || 12;

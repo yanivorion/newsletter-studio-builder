@@ -797,6 +797,7 @@ function SidebarEditor({
           placeholder="Newsletter title"
           className="flex h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#04D1FC] focus:border-transparent"
         />
+        <p className="text-[10px] text-zinc-400 mt-1">Link: <code className="bg-zinc-100 px-1 rounded text-[9px]">[text](url)</code> · Line break: <code className="bg-zinc-100 px-1 rounded text-[9px]">&lt;br&gt;</code></p>
 
         <div className="grid grid-cols-3 gap-2 mt-3">
           <div className="space-y-1">
@@ -1125,6 +1126,7 @@ function SidebarEditor({
           placeholder="Enter your text..."
           className="resize-none"
         />
+        <p className="text-[10px] text-zinc-400 mt-1">Link: <code className="bg-zinc-100 px-1 rounded text-[9px]">[text](url)</code> · Line break: <code className="bg-zinc-100 px-1 rounded text-[9px]">&lt;br&gt;</code></p>
       </FieldGroup>
 
       <div className="grid grid-cols-2 gap-3">
@@ -1204,6 +1206,15 @@ function SidebarEditor({
           sectionKey={selectedSection}
           placeholder="Section title"
         />
+        <div className="space-y-1 mt-2">
+          <span className="text-[9px] text-zinc-400">Link URL (optional)</span>
+          <LocalInput
+            value={section.link || ''}
+            onSave={(val) => handleFieldChange('link', val)}
+            placeholder="https://..."
+            className="w-full h-8 px-2 text-xs rounded border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#04D1FC] focus:border-transparent"
+          />
+        </div>
       </FieldGroup>
 
       <FieldGroup label="Background">
@@ -2321,6 +2332,7 @@ function SidebarEditor({
               sectionKey={selectedSection}
               placeholder="Section title"
             />
+            <p className="text-[10px] text-zinc-400 mt-1">Link: <code className="bg-zinc-100 px-1 rounded text-[9px]">[text](url)</code> · Line break: <code className="bg-zinc-100 px-1 rounded text-[9px]">&lt;br&gt;</code></p>
           </FieldGroup>
 
           <FieldGroup label="Body Text">
@@ -2332,6 +2344,7 @@ function SidebarEditor({
               placeholder="Description..."
               className="resize-none"
             />
+            <p className="text-[10px] text-zinc-400 mt-1">Link: <code className="bg-zinc-100 px-1 rounded text-[9px]">[text](url)</code> · Line break: <code className="bg-zinc-100 px-1 rounded text-[9px]">&lt;br&gt;</code></p>
           </FieldGroup>
 
           <FieldGroup label="Image Height">
@@ -3162,6 +3175,7 @@ function SidebarEditor({
           placeholder="Enter content..."
           className="resize-none"
         />
+        <p className="text-[10px] text-zinc-400 mt-1">Link: <code className="bg-zinc-100 px-1 rounded text-[9px]">[text](url)</code> · Line break: <code className="bg-zinc-100 px-1 rounded text-[9px]">&lt;br&gt;</code></p>
         <div className="grid grid-cols-2 gap-2 mt-2">
           <div className="space-y-1">
             <span className="text-[10px] text-zinc-400">Font Size</span>
@@ -3276,6 +3290,7 @@ function SidebarEditor({
           placeholder="Card title"
           className="flex h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#04D1FC]"
         />
+        <p className="text-[10px] text-zinc-400 mt-1">Link: <code className="bg-zinc-100 px-1 rounded text-[9px]">[text](url)</code> · Line break: <code className="bg-zinc-100 px-1 rounded text-[9px]">&lt;br&gt;</code></p>
         <div className="grid grid-cols-2 gap-2 mt-2">
           <div className="space-y-1">
             <span className="text-[10px] text-zinc-400">Font Size</span>
@@ -3306,6 +3321,7 @@ function SidebarEditor({
           placeholder="Card content..."
           className="resize-none"
         />
+        <p className="text-[10px] text-zinc-400 mt-1">Link: <code className="bg-zinc-100 px-1 rounded text-[9px]">[text](url)</code> · Line break: <code className="bg-zinc-100 px-1 rounded text-[9px]">&lt;br&gt;</code></p>
         <div className="grid grid-cols-2 gap-2 mt-2">
           <div className="space-y-1">
             <span className="text-[10px] text-zinc-400">Font Size</span>

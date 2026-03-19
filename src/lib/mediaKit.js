@@ -110,6 +110,42 @@ export const mediaKit = {
       url: '/media-kit/cover-nologo-3.png',
       category: 'cover-nologo'
     },
+    {
+      id: 'slide-design-editor',
+      name: 'CP3 — Design Editor',
+      url: '/media-kit/slide-design-editor.png',
+      category: 'cp3'
+    },
+    {
+      id: 'slide-export-site',
+      name: 'CP3 — Export Site Code',
+      url: '/media-kit/slide-export-site.png',
+      category: 'cp3'
+    },
+    {
+      id: 'slide-cms-context',
+      name: 'CP3 — CMS & Context',
+      url: '/media-kit/slide-cms-context.png',
+      category: 'cp3'
+    },
+    {
+      id: 'slide-video-thumb',
+      name: 'CP3 — Video Thumbnail',
+      url: '/media-kit/slide-video-thumb.png',
+      category: 'cp3'
+    },
+    {
+      id: 'slide-code-editor',
+      name: 'CP3 — Code Editor',
+      url: '/media-kit/slide-code-editor.png',
+      category: 'cp3'
+    },
+    {
+      id: 'slide-timeline',
+      name: 'CP3 — Timeline',
+      url: '/media-kit/slide-timeline.png',
+      category: 'cp3'
+    },
   ],
 
   categories: [
@@ -118,7 +154,8 @@ export const mediaKit = {
     { id: 'background', name: 'Backgrounds' },
     { id: 'cover', name: 'Covers' },
     { id: 'cover-nologo', name: 'Covers / No Logo' },
-    { id: 'template', name: 'Templates' }
+    { id: 'template', name: 'Templates' },
+    { id: 'cp3', name: 'Checkpoint 3' }
   ]
 };
 

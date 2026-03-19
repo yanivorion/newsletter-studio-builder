@@ -1,6 +1,7 @@
 import React from 'react';
 import { Image, GripHorizontal } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { renderLinkedText } from '../../lib/textUtils';
 
 // Inline draggable spacer for edit mode
 function InlineSpacerHandle({ value, onChange, min = 0, max = 100, label, isEditing }) {
@@ -282,7 +283,7 @@ function HeaderSection({
       
       {title && (
         <h1 style={titleStyle}>
-          {title}
+          {renderLinkedText(title)}
         </h1>
       )}
       

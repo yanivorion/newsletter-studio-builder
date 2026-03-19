@@ -1,4 +1,5 @@
 import React from 'react';
+import { renderLinkedText } from '../../lib/textUtils';
 
 const FONT_STACKS = {
   'Poppins': "'Poppins', 'Helvetica Neue', Helvetica, Arial, sans-serif",
@@ -24,7 +25,7 @@ function TextSection({ content, textAlign, direction, fontFamily, fontSize, colo
 
   return (
     <div style={textStyle}>
-      {content || 'Enter your text here...'}
+      {renderLinkedText(content || 'Enter your text here...', { color: color || '#04D1FC' })}
     </div>
   );
 }

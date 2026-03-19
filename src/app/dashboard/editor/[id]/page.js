@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft, Download, Copy, X, Mail, Undo2, Redo2,
   Clipboard, Check, Save, Upload, FileJson, Eye, Send,
-  Code, Loader2, AlertTriangle, Users,
+  Code, Loader2, AlertTriangle, Users, Share2, Link as LinkIcon,
 } from 'lucide-react';
 import NewsletterEditor from '@/components/editor/NewsletterEditor';
 import SidebarEditor from '@/components/editor/SidebarEditor';
@@ -13,7 +13,7 @@ import FloatingMediaModal from '@/components/editor/FloatingMediaModal';
 import LayoutCarousel from '@/components/editor/LayoutCarousel';
 import TemplateSelector from '@/components/editor/TemplateSelector';
 import { Button } from '@/components/ui/Button';
-import { exportToHTML, exportForGmail } from '@/utils/emailExport';
+import { exportToHTML, exportForGmail, resolveNewsletterImages } from '@/utils/emailExport';
 import { convertNewsletterForEmail, findDynamicBlocks } from '@/utils/convertNewsletter';
 import { exportMarqueeAsGif } from '@/utils/sequenceGifExport';
 import { cn } from '@/lib/utils';
@@ -51,6 +51,7 @@ export default function EditorPage() {
   const [previewError, setPreviewError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [copiedDesign, setCopiedDesign] = useState(false);
+  const [copiedShareLink, setCopiedShareLink] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [savedToProject, setSavedToProject] = useState(false);
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
@@ -446,19 +447,95 @@ export default function EditorPage() {
     setMediaModalOpen(true);
   }, []);
 
-  const handleBulkUpload = useCallback((urls) => {
+  const uploadFilesToSupabase = useCallback(async (files) => {
+    return Promise.all(
+      Array.from(files).map(async (file) => {
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('folder', 'newsletters/uploads');
+          formData.append('userId', user?.id || 'public');
+          const res = await fetch('/api/images/upload', { method: 'POST', body: formData });
+          if (!res.ok) throw new Error('Upload failed');
+          const data = await res.json();
+          return data.url;
+        } catch {
+          return null;
+        }
+      })
+    );
+  }, [user]);
+
+  const handleBulkUpload = useCallback(async (files) => {
+    const uploadedUrls = await uploadFilesToSupabase(files);
+    const validUrls = uploadedUrls.filter(Boolean);
+    if (validUrls.length === 0) return;
+
+    if (mediaTargetBlock) {
+      const { sectionId, blockId, imageIndex, isCollage } = mediaTargetBlock;
+      const url = validUrls[0];
+      const updateBlock = (b) => {
+        if (b.id !== blockId) return b;
+        if (isCollage) {
+          const imgs = [...(b.images || [])];
+          imgs[imageIndex] = url;
+          return { ...b, images: imgs };
+        }
+        if (b.type === 'promoCard' || b.type === 'recipe') {
+          return { ...b, image: url };
+        }
+        return { ...b, src: url };
+      };
+      setNewsletter((prev) => ({
+        ...prev,
+        sections: prev.sections.map((s) => {
+          if (s.id !== sectionId) return s;
+          if (isGridSection(s)) {
+            return {
+              ...s,
+              rows: s.rows.map((r) => ({
+                ...r,
+                columns: r.columns.map((c) => ({
+                  ...c,
+                  blocks: c.blocks.map(updateBlock),
+                })),
+              })),
+            };
+          }
+          return { ...s, blocks: (s.blocks || []).map(updateBlock) };
+        }),
+      }));
+      setMediaTargetBlock(null);
+      setMediaModalOpen(false);
+      return;
+    }
+
     setNewsletter((prev) => {
       const emptySlots = [];
 
       const scanBlock = (b, sectionId) => {
         if (b.type === 'image' && !b.src) {
-          emptySlots.push({ sectionId, blockId: b.id, type: 'image' });
+          emptySlots.push({ sectionId, blockId: b.id, field: 'src' });
+        }
+        if (b.type === 'promoCard' && !b.image) {
+          emptySlots.push({ sectionId, blockId: b.id, field: 'image' });
+        }
+        if (b.type === 'recipe' && !b.image) {
+          emptySlots.push({ sectionId, blockId: b.id, field: 'image' });
         }
         if (b.type === 'imageCollage' || b.type === 'multiLayout') {
-          const totalSlots = b.type === 'multiLayout' ? 6 : 4;
-          for (let i = 0; i < totalSlots; i++) {
+          const totalSlots = b.type === 'multiLayout' ? 6 : (b.images?.length || 4);
+          for (let i = 0; i < Math.max(totalSlots, 4); i++) {
             if (!b.images?.[i]) {
-              emptySlots.push({ sectionId, blockId: b.id, type: 'collage', imageIndex: i });
+              emptySlots.push({ sectionId, blockId: b.id, field: 'images', imageIndex: i });
+            }
+          }
+        }
+        if (b.type === 'imageSequence') {
+          const slotCount = b.images?.length || 4;
+          for (let i = 0; i < slotCount; i++) {
+            if (!b.images?.[i]) {
+              emptySlots.push({ sectionId, blockId: b.id, field: 'images', imageIndex: i });
             }
           }
         }
@@ -476,16 +553,19 @@ export default function EditorPage() {
         }
       }
 
-      const assignments = urls.slice(0, emptySlots.length);
+      const assignments = validUrls.slice(0, emptySlots.length);
       if (assignments.length === 0) return prev;
 
       const blockUpdates = {};
       assignments.forEach((url, i) => {
         const slot = emptySlots[i];
-        if (slot.type === 'image') {
-          blockUpdates[slot.blockId] = { src: url };
-        } else if (slot.type === 'collage') {
-          if (!blockUpdates[slot.blockId]) blockUpdates[slot.blockId] = { images: {} };
+        if (!blockUpdates[slot.blockId]) blockUpdates[slot.blockId] = {};
+        if (slot.field === 'src') {
+          blockUpdates[slot.blockId].src = url;
+        } else if (slot.field === 'image') {
+          blockUpdates[slot.blockId].image = url;
+        } else if (slot.field === 'images') {
+          if (!blockUpdates[slot.blockId].images) blockUpdates[slot.blockId].images = {};
           blockUpdates[slot.blockId].images[slot.imageIndex] = url;
         }
       });
@@ -493,15 +573,17 @@ export default function EditorPage() {
       const applyUpdate = (b) => {
         const upd = blockUpdates[b.id];
         if (!upd) return b;
-        if (upd.src) return { ...b, src: upd.src };
+        const updated = { ...b };
+        if (upd.src) updated.src = upd.src;
+        if (upd.image) updated.image = upd.image;
         if (upd.images) {
           const imgs = [...(b.images || [])];
           for (const [idx, url] of Object.entries(upd.images)) {
             imgs[parseInt(idx)] = url;
           }
-          return { ...b, images: imgs };
+          updated.images = imgs;
         }
-        return b;
+        return updated;
       };
 
       return {
@@ -527,7 +609,7 @@ export default function EditorPage() {
       };
     });
     setMediaModalOpen(false);
-  }, [setNewsletter]);
+  }, [setNewsletter, user, mediaTargetBlock, uploadFilesToSupabase]);
 
   const handleMediaSelect = useCallback((url, logoData) => {
     if (mediaTargetBlock) {
@@ -621,13 +703,14 @@ export default function EditorPage() {
   }
 
   // Export
-  const handleExport = () => {
+  const handleExport = async () => {
     const dynamics = findDynamicBlocks(newsletter);
     if (dynamics.length > 0) {
       handleConvertForEmail();
       return;
     }
-    const html = exportToHTML(newsletter);
+    const resolved = await resolveNewsletterImages(newsletter, user?.id);
+    const html = exportToHTML(resolved);
     setExportedHTML(html);
     setShowExportModal(true);
   };
@@ -660,7 +743,7 @@ export default function EditorPage() {
       position: 'fixed',
       left: '0',
       top: '0',
-      width: '700px',
+      width: '780px',
       opacity: '0',
       pointerEvents: 'none',
       zIndex: '-1',
@@ -681,14 +764,14 @@ export default function EditorPage() {
   }
 
   const handleCopyDesign = async () => {
-    // If the newsletter has dynamic blocks, convert them first
     const dynamics = findDynamicBlocks(newsletter);
     if (dynamics.length > 0) {
       handleConvertForEmail();
       return;
     }
 
-    const html = exportForGmail(newsletter);
+    const resolved = await resolveNewsletterImages(newsletter, user?.id);
+    const html = exportForGmail(resolved);
     const ok = copyRenderedHtml(html);
     if (!ok) {
       try { await navigator.clipboard.writeText(html); } catch { /* */ }
@@ -718,7 +801,8 @@ export default function EditorPage() {
 
   const handleCopyConvertedDesign = async () => {
     const data = convertedNewsletter || newsletter;
-    const html = exportForGmail(data);
+    const resolved = await resolveNewsletterImages(data, user?.id);
+    const html = exportForGmail(resolved);
     const ok = copyRenderedHtml(html);
     if (!ok) {
       try { await navigator.clipboard.writeText(html); } catch { /* */ }
@@ -727,9 +811,10 @@ export default function EditorPage() {
     setTimeout(() => setCopiedConverted(false), 2500);
   };
 
-  const handleDownloadConvertedHTML = () => {
+  const handleDownloadConvertedHTML = async () => {
     const data = convertedNewsletter || newsletter;
-    const html = exportToHTML(data);
+    const resolved = await resolveNewsletterImages(data, user?.id);
+    const html = exportToHTML(resolved);
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -949,6 +1034,27 @@ export default function EditorPage() {
           <button onClick={handleSaveToProject} style={{ ...ghostBtn, color: savedToProject ? '#16a34a' : 'var(--text-2)' }}>
             {savedToProject ? <><Check size={13} /> Saved!</> : <><Save size={13} /> Save</>}
           </button>
+          <button
+            onClick={() => {
+              const nid = newsletter?.projectId || params.id;
+              if (!nid || nid === 'new') {
+                alert('Save the newsletter first before sharing.');
+                return;
+              }
+              const url = `${window.location.origin}/templates/${nid}`;
+              navigator.clipboard.writeText(url).then(() => {
+                setCopiedShareLink(true);
+                setTimeout(() => setCopiedShareLink(false), 2500);
+              });
+            }}
+            style={{
+              ...ghostBtn,
+              color: copiedShareLink ? '#16a34a' : 'var(--text-2)',
+            }}
+            title="Copy share link"
+          >
+            {copiedShareLink ? <><Check size={13} /> Link Copied!</> : <><Share2 size={13} /> Share</>}
+          </button>
           <button onClick={handleDownloadJSON} style={ghostBtn} title="Download JSON"><FileJson size={14} /></button>
           <button onClick={() => fileInputRef.current?.click()} style={ghostBtn} title="Upload JSON"><Upload size={14} /></button>
           <input ref={fileInputRef} type="file" accept=".json" onChange={handleUploadJSON} style={{ display: 'none' }} />
@@ -1043,6 +1149,7 @@ export default function EditorPage() {
         onClose={() => setMediaModalOpen(false)}
         onSelectLogo={handleMediaSelect}
         onBulkUpload={handleBulkUpload}
+        userId={user?.id}
       />
 
       {/* === MODALS === */}

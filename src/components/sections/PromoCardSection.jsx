@@ -1,5 +1,6 @@
 import React from 'react';
 import { Image } from 'lucide-react';
+import { renderLinkedText } from '../../lib/textUtils';
 
 /**
  * PromoCardSection - A promotional card with image and CTA
@@ -143,11 +144,11 @@ function PromoCardSection({
     <div style={containerStyle}>
       {/* Content */}
       <div style={contentStyle}>
-        <h3 style={titleStyle}>{title}</h3>
+        <h3 style={titleStyle}>{renderLinkedText(title)}</h3>
         <div style={bodyStyle}>
           {paragraphs.map((paragraph, index) => (
             <p key={index} style={{ margin: index === 0 ? 0 : '0.8em 0 0 0' }}>
-              {paragraph}
+              {renderLinkedText(paragraph)}
             </p>
           ))}
         </div>

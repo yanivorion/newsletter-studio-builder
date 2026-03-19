@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { ArrowRight, Upload, Trash2, Sparkles } from 'lucide-react';
 
 // Blank starter template
@@ -80,6 +81,7 @@ function TemplateSelector({
   onDeleteProject,
   onImportJSON
 }) {
+  const router = useRouter();
   const [hoveredButton, setHoveredButton] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -293,6 +295,56 @@ function TemplateSelector({
             maxWidth: '900px',
             margin: '0 auto',
           }}>
+            {/* Hero Above Template */}
+            <button
+              onClick={() => router.push('/templates/studio-2-hero-above')}
+              onMouseEnter={() => setHoveredButton('tpl-hero-above')}
+              onMouseLeave={() => setHoveredButton(null)}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'stretch',
+                backgroundColor: '#FFFFFF',
+                border: `1px solid ${hoveredButton === 'tpl-hero-above' ? '#1C1917' : cardBorderColor}`,
+                borderRadius: '12px',
+                overflow: 'hidden',
+                cursor: 'pointer',
+                transition: 'all 200ms ease-out',
+                transform: hoveredButton === 'tpl-hero-above' ? 'translateY(-2px)' : 'translateY(0)',
+                boxShadow: hoveredButton === 'tpl-hero-above' ? '0 8px 24px rgba(0,0,0,0.1)' : '0 2px 8px rgba(0,0,0,0.04)',
+                padding: 0,
+                textAlign: 'left',
+              }}
+            >
+              <div style={{
+                height: 160,
+                background: 'linear-gradient(180deg, #E8E8EC 0%, #FFFFFF 100%)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                padding: '16px 20px',
+                gap: 6,
+              }}>
+                <div style={{ width: '60%', height: 40, background: '#f4f4f5', borderRadius: 8 }} />
+                <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.06em', color: '#1a1a3e', textTransform: 'uppercase' }}>
+                  BUILDER
+                </div>
+                <hr style={{ width: '60%', border: 'none', borderTop: '1px solid #E5E7EB', margin: '2px 0' }} />
+                <div style={{ fontSize: 11, color: '#6B7280', textAlign: 'center' }}>
+                  Hero Above Badge
+                </div>
+              </div>
+              <div style={{ padding: '16px 20px' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: heroTextColor, marginBottom: 4 }}>
+                  Studio 2.0 — Hero Above
+                </div>
+                <div style={{ fontSize: 12, color: subheadlineColor }}>
+                  Header, hero-above layout cards, footer
+                </div>
+              </div>
+            </button>
+
             {/* Saved Projects as Template Cards */}
             {projects.map(project => {
               const header = project.data?.sections?.find(s => s.type === 'header');
@@ -304,7 +356,7 @@ function TemplateSelector({
                   style={{ position: 'relative' }}
                 >
                   <button
-                    onClick={() => onLoadProject?.(project.id)}
+                    onClick={() => router.push(`/templates/${project.id}`)}
                     onMouseEnter={() => setHoveredButton(hKey)}
                     onMouseLeave={() => setHoveredButton(null)}
                     style={{

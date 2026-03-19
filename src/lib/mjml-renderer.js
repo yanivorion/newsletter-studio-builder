@@ -9,6 +9,8 @@
  * - Responsive stacking on mobile
  */
 
+import { linksToHTML } from './textUtils';
+
 let mjml2html;
 async function getMjml() {
   if (!mjml2html) {
@@ -71,7 +73,7 @@ function renderHeader(section) {
           padding="0 20px 10px"
           line-height="1.2"
           letter-spacing="${section.titleLetterSpacing || '-0.02em'}"
-        >${section.title || ''}</mj-text>
+        >${linksToHTML(section.title || '')}</mj-text>
         ${section.subtitle ? `
         <mj-text
           font-family="${font}"
@@ -144,7 +146,7 @@ function renderMarquee(section) {
 
 function renderText(section) {
   const font = fontStack(section.fontFamily || 'Poppins');
-  const content = (section.content || '').replace(/\n/g, '<br>');
+  const content = linksToHTML((section.content || '')).replace(/\n/g, '<br>');
   const dir = section.direction === 'rtl' ? 'direction:rtl;' : '';
   const bg = section.backgroundColor === 'transparent' || !section.backgroundColor
     ? 'transparent' : section.backgroundColor;
@@ -190,7 +192,7 @@ function renderAccentText(section) {
   const font = fontStack(section.fontFamily || 'Noto Sans Hebrew');
   const dir = section.direction || 'rtl';
   const align = section.contentAlign || 'right';
-  const content = (section.content || '').replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
+  const content = linksToHTML((section.content || '')).replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
 
   let tagMjml = '';
   if (section.tagText) {
@@ -226,7 +228,7 @@ function renderPromoCard(section) {
   const font = fontStack(section.fontFamily || 'Noto Sans Hebrew');
   const dir = section.direction || 'rtl';
   const align = section.contentAlign || 'right';
-  const body = (section.body || '').replace(/\n/g, '<br>');
+  const body = linksToHTML((section.body || '')).replace(/\n/g, '<br>');
   const pt = section.paddingTop ?? section.padding ?? 32;
   const pb = section.paddingBottom ?? section.padding ?? 32;
 
@@ -253,7 +255,7 @@ function renderPromoCard(section) {
         align="${align}"
         line-height="1.3"
         padding="0 0 ${section.titleToBodyGap ?? 16}px 0"
-      ><div style="direction:${dir};">${section.title || 'Card Title'}</div></mj-text>
+      ><div style="direction:${dir};">${linksToHTML(section.title || 'Card Title')}</div></mj-text>
       <mj-text
         font-family="${font}"
         font-size="${section.bodyFontSize || 16}px"
@@ -350,7 +352,7 @@ function renderRecipe(section) {
     <mj-section background-color="${section.backgroundColor || '#ffffff'}" padding="30px 20px">
       <mj-column>
         <mj-text font-family="${font}" font-size="24px" font-weight="600" color="#333333" align="center" padding="0 0 20px 0">
-          <div style="direction:rtl;">${section.title || ''}</div>
+          <div style="direction:rtl;">${linksToHTML(section.title || '')}</div>
         </mj-text>
         ${section.image ? `
         <mj-image src="${section.image}" alt="${section.title || ''}" border-radius="8px" padding="0 0 20px 0" />` : ''}
@@ -503,7 +505,8 @@ function badgeHtml(block, font) {
   const chevron = block.showChevron
     ? `<td style="width:40px;padding-right:${pad}px;vertical-align:middle;text-align:center;"><div style="width:28px;height:28px;border-radius:50%;background-color:rgba(255,255,255,0.25);line-height:28px;text-align:center;margin:0 auto;">${arrow}</div></td>`
     : '';
-  return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:${block.backgroundColor};border-radius:${block.borderRadius || 24}px;"><tr><td style="padding:${pad}px ${pad + 8}px;font-family:${font};font-size:${block.fontSize || 14}px;font-weight:${block.fontWeight || 600};color:${clr};letter-spacing:${block.letterSpacing || '0.06em'};font-style:${block.fontStyle || 'normal'};">${block.text || ''}</td>${chevron}</tr></table>`;
+  const inner = `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:${block.backgroundColor};border-radius:${block.borderRadius || 24}px;"><tr><td style="padding:${pad}px ${pad + 8}px;font-family:${font};font-size:${block.fontSize || 14}px;font-weight:${block.fontWeight || 600};color:${clr};letter-spacing:${block.letterSpacing || '0.06em'};font-style:${block.fontStyle || 'normal'};">${block.text || ''}</td>${chevron}</tr></table>`;
+  return block.link ? `<a href="${block.link}" style="color:inherit;text-decoration:none;">${inner}</a>` : inner;
 }
 
 // ── Block-level MJML rendering ──────────────────────────────────────
@@ -529,7 +532,7 @@ function renderTitleBlock(block) {
         letter-spacing="${block.letterSpacing || '0.1em'}"
         line-height="${block.lineHeight || 1.2}"
         padding="0"
-      ><div style="margin:0;padding:0;font-style:${block.fontStyle || 'normal'};">${block.text || ''}</div></mj-text>
+      ><div style="margin:0;padding:0;font-style:${block.fontStyle || 'normal'};">${block.link ? `<a href="${block.link}" style="color:inherit;text-decoration:none;">${block.text || ''}</a>` : (block.text || '')}</div></mj-text>
     </mj-column></mj-section>`;
 }
 
@@ -654,7 +657,7 @@ function blockToColumnContent(block) {
 
   switch (block.type) {
     case 'text': {
-      const content = (block.content || '').replace(/\n/g, '<br>');
+      const content = linksToHTML((block.content || '')).replace(/\n/g, '<br>');
       const dir = block.direction === 'rtl' ? 'direction:rtl;' : '';
       return `<mj-text font-family="${font}" font-size="${block.fontSize || 16}px" color="${block.color || '#333333'}" align="${block.textAlign || 'center'}" line-height="${block.lineHeight || 1.6}" padding="${pv(block.paddingV, pv(block.padding, 0))}px ${pv(block.paddingH, 0)}px"><div style="margin:0;padding:0;${dir}">${content}</div></mj-text>`;
     }
@@ -705,20 +708,20 @@ function blockToColumnContent(block) {
     }
     case 'multiLayout': {
       const mTitle = block.title || '';
-      const mBody = (block.body || '').replace(/\n/g, '<br>');
+      const mBody = linksToHTML((block.body || '')).replace(/\n/g, '<br>');
       const mBadge = block.badgeText || 'BUILDER';
       const mBadgeClr = block.badgeColor || '#1a1a3e';
       return `
         <mj-text font-family="${font}" font-size="14px" font-weight="600" color="${mBadgeClr}" letter-spacing="0.06em" padding="0 0 4px 0" text-transform="uppercase">${mBadge}</mj-text>
         <mj-divider border-color="#E5E7EB" border-width="1px" padding="0 0 8px 0" />
-        <mj-text font-family="${font}" font-size="13px" font-weight="700" color="#1C1917" letter-spacing="0.03em" line-height="1.3" padding="8px 0 6px 0">${mTitle}</mj-text>
+        <mj-text font-family="${font}" font-size="13px" font-weight="700" color="#1C1917" letter-spacing="0.03em" line-height="1.3" padding="8px 0 6px 0">${linksToHTML(mTitle)}</mj-text>
         <mj-text font-family="${font}" font-size="13px" color="#6B7280" line-height="1.65" padding="0">${mBody}</mj-text>`;
     }
     case 'promoCard': {
       const dir = block.direction || 'rtl';
-      const body = (block.body || '').replace(/\n/g, '<br>');
+      const body = linksToHTML((block.body || '')).replace(/\n/g, '<br>');
       return `
-        <mj-text font-family="${font}" font-size="${block.titleFontSize || 28}px" font-weight="${block.titleFontWeight || 700}" color="${block.titleColor || '#1A1A1A'}" align="${block.contentAlign || 'right'}" line-height="1.3" padding="0 0 16px 0"><div style="direction:${dir};">${block.title || ''}</div></mj-text>
+        <mj-text font-family="${font}" font-size="${block.titleFontSize || 28}px" font-weight="${block.titleFontWeight || 700}" color="${block.titleColor || '#1A1A1A'}" align="${block.contentAlign || 'right'}" line-height="1.3" padding="0 0 16px 0"><div style="direction:${dir};">${linksToHTML(block.title || '')}</div></mj-text>
         <mj-text font-family="${font}" font-size="${block.bodyFontSize || 16}px" color="${block.bodyColor || '#555555'}" align="${block.contentAlign || 'right'}" line-height="${block.bodyLineHeight || 1.7}" padding="0"><div style="direction:${dir};">${body}</div></mj-text>`;
     }
     case 'imageCollage': {
@@ -771,7 +774,7 @@ function blockToColumnContent(block) {
       const ingredients = (block.ingredients || '').replace(/\n/g, '<br>');
       const instructions = (block.instructions || '').replace(/\n/g, '<br>');
       return `
-        <mj-text font-family="${font}" font-size="24px" font-weight="600" color="#333" align="center" padding="0 0 20px 0"><div style="direction:rtl;">${block.title || ''}</div></mj-text>
+        <mj-text font-family="${font}" font-size="24px" font-weight="600" color="#333" align="center" padding="0 0 20px 0"><div style="direction:rtl;">${linksToHTML(block.title || '')}</div></mj-text>
         ${block.image ? `<mj-image src="${block.image}" alt="${block.title || ''}" border-radius="8px" padding="0 0 20px 0" />` : ''}
         <mj-text font-family="${font}" font-size="14px" color="#333" align="right" line-height="1.8" padding="0 0 15px 0"><div style="direction:rtl;">${ingredients}</div></mj-text>
         <mj-text font-family="${font}" font-size="14px" color="#333" align="right" line-height="1.8" padding="0"><div style="direction:rtl;">${instructions}</div></mj-text>`;

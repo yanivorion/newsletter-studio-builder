@@ -1,4 +1,5 @@
 import React from 'react';
+import { renderLinkedText } from '../../lib/textUtils';
 
 /**
  * AccentTextSection - A text section with a prominent tag/badge
@@ -87,7 +88,7 @@ function AccentTextSection({
       <div style={contentStyle}>
         {paragraphs.map((paragraph, index) => (
           <p key={index} style={{ margin: index === 0 ? 0 : '1em 0 0 0' }}>
-            {paragraph}
+            {renderLinkedText(paragraph)}
           </p>
         ))}
       </div>

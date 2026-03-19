@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, Grid3X3, List, FileText, Loader2 } from 'lucide-react';
+import { Plus, Search, Grid3X3, List, FileText, Loader2, Share2, Check } from 'lucide-react';
 import { useNewsletterStorage } from '@/hooks/useNewsletterStorage';
 import { useAuth } from '@/context/AuthContext';
 
@@ -14,6 +14,17 @@ export default function DashboardPage() {
   const projects = newsletters;
   const [view, setView] = useState('grid');
   const [search, setSearch] = useState('');
+  const [copiedId, setCopiedId] = useState(null);
+
+  const handleShare = (e, projectId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const url = `${window.location.origin}/templates/${projectId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedId(projectId);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
 
   const filtered = projects.filter(
     (n) =>
@@ -235,16 +246,36 @@ export default function DashboardPage() {
                   <FileText size={24} color="var(--accent)" style={{ opacity: 0.4 }} />
                 )}
               </div>
-              <h3
-                style={{
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: 'var(--text-1)',
-                  marginBottom: 4,
-                }}
-              >
-                {project.name || 'Untitled'}
-              </h3>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                <h3
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: 'var(--text-1)',
+                    marginBottom: 4,
+                    flex: 1,
+                    minWidth: 0,
+                  }}
+                >
+                  {project.name || 'Untitled'}
+                </h3>
+                <button
+                  onClick={(e) => handleShare(e, project.id)}
+                  title="Copy share link"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 4,
+                    borderRadius: 6,
+                    color: copiedId === project.id ? '#16a34a' : 'var(--text-3)',
+                    flexShrink: 0,
+                    transition: 'color 200ms',
+                  }}
+                >
+                  {copiedId === project.id ? <Check size={14} /> : <Share2 size={14} />}
+                </button>
+              </div>
               <p
                 style={{
                   fontSize: 11,

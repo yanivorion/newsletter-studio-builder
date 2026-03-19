@@ -477,7 +477,7 @@ function NewsletterEditor({
   return (
     <div className="flex flex-col gap-0 relative">
       {/* ── Top Bar: Draggable block types ── */}
-      <div className="sticky top-0 z-40 mx-auto mb-4">
+      <div className="sticky top-0 z-40 mx-auto mb-4" style={{ backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}>
         <div className="glass-panel-strong flex items-center gap-1 p-1.5 rounded-xl">
           <span className="text-[10px] text-zinc-400 px-2 font-medium uppercase tracking-[0.08em]">Drag</span>
           <div className="h-4 w-px bg-zinc-200/60" />

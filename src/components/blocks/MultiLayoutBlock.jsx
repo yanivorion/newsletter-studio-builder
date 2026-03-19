@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ImageIcon, ChevronDown } from 'lucide-react';
+import { renderLinkedText } from '../../lib/textUtils';
 
 const LAYOUT_PRESETS = {
   'text-only': {
@@ -250,13 +251,16 @@ export default function MultiLayoutBlock({
     </div>
   );
 
+  const linkedTitle = renderLinkedText(title);
+  const linkedBody = renderLinkedText(body);
+
   const renderTextFull = () => (
     <div style={{ padding: '8px 0 0' }}>
       <div style={{ fontSize: titleFontSize, fontWeight: 700, letterSpacing: '0.03em', color: '#1C1917', lineHeight: 1.3, marginBottom: 6 }}>
-        {title}
+        {linkedTitle}
       </div>
       <div style={{ fontSize: bodyFontSize, color: '#6B7280', lineHeight: 1.65, fontFamily: 'Poppins, sans-serif' }}>
-        {body}
+        {linkedBody}
       </div>
     </div>
   );
@@ -264,10 +268,10 @@ export default function MultiLayoutBlock({
   const renderTextTwoCol = () => (
     <div style={{ display: 'grid', gridTemplateColumns: '5fr 7fr', gap: 12, padding: '8px 0 0' }}>
       <div style={{ fontSize: titleFontSize, fontWeight: 700, letterSpacing: '0.03em', color: '#1C1917', lineHeight: 1.3 }}>
-        {title}
+        {linkedTitle}
       </div>
       <div style={{ fontSize: bodyFontSize, color: '#6B7280', lineHeight: 1.65, fontFamily: 'Poppins, sans-serif' }}>
-        {body}
+        {linkedBody}
       </div>
     </div>
   );
@@ -327,10 +331,10 @@ export default function MultiLayoutBlock({
             />
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <div style={{ fontSize: titleFontSize, fontWeight: 700, letterSpacing: '0.03em', color: '#1C1917', lineHeight: 1.3, marginBottom: 6 }}>
-                {title}
+                {linkedTitle}
               </div>
               <div style={{ fontSize: bodyFontSize, color: '#6B7280', lineHeight: 1.65, fontFamily: 'Poppins, sans-serif' }}>
-                {body}
+                {linkedBody}
               </div>
             </div>
           </div>
@@ -348,10 +352,10 @@ export default function MultiLayoutBlock({
               />
               <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <div style={{ fontSize: titleFontSize, fontWeight: 700, letterSpacing: '0.03em', color: '#1C1917', lineHeight: 1.3, marginBottom: 6 }}>
-                  {title}
+                  {linkedTitle}
                 </div>
                 <div style={{ fontSize: bodyFontSize, color: '#6B7280', lineHeight: 1.65, fontFamily: 'Poppins, sans-serif' }}>
-                  {body}
+                  {linkedBody}
                 </div>
               </div>
             </div>
@@ -366,8 +370,8 @@ export default function MultiLayoutBlock({
           )}
           {preset.textLayout === 'centered' ? (
             <div style={{ padding: '8px 0 0', textAlign: 'center' }}>
-              <div style={{ fontSize: titleFontSize, fontWeight: 700, letterSpacing: '0.03em', color: '#1C1917', lineHeight: 1.3, marginBottom: 6 }}>{title}</div>
-              <div style={{ fontSize: bodyFontSize, color: '#6B7280', lineHeight: 1.65, fontFamily: 'Poppins, sans-serif' }}>{body}</div>
+              <div style={{ fontSize: titleFontSize, fontWeight: 700, letterSpacing: '0.03em', color: '#1C1917', lineHeight: 1.3, marginBottom: 6 }}>{linkedTitle}</div>
+              <div style={{ fontSize: bodyFontSize, color: '#6B7280', lineHeight: 1.65, fontFamily: 'Poppins, sans-serif' }}>{linkedBody}</div>
             </div>
           ) : preset.textLayout === 'images-then-two-col' ? renderTextTwoCol() : renderTextFull()}
         </>

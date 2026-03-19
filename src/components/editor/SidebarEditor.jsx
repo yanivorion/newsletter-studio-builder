@@ -2783,8 +2783,20 @@ function SidebarEditor({
                 ) : (
                   <input
                     type="text"
-                    value={item.value || ''}
-                    onChange={(e) => updateItemAt(i, { value: e.target.value })}
+                    defaultValue={item.value || ''}
+                    onBlur={(e) => {
+                      if (e.target.value !== (item.value || '')) {
+                        updateItemAt(i, { value: e.target.value });
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (e.target.value !== (item.value || '')) {
+                          updateItemAt(i, { value: e.target.value });
+                        }
+                      }
+                    }}
                     placeholder="Enter text..."
                     className="w-full h-7 px-2 text-xs rounded border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#04D1FC] focus:border-transparent"
                   />

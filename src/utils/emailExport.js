@@ -917,6 +917,27 @@ function exportMultiLayout(block) {
   const borderRadius = block.imageBorderRadius || 12;
   const imgHeight = block.imageHeight || 180;
 
+  if (layout === 'track-list') {
+    const tracks = block.tracks || [
+      { title: 'TITLE PROJECT 01', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+      { title: 'TITLE PROJECT 02', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+      { title: 'TITLE PROJECT 03', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+      { title: 'TITLE PROJECT 04', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+    ];
+    const tracksHtml = tracks.map((t) => {
+      const subjectsHtml = t.subjects.map(s =>
+        `<tr><td style="padding:2px 0;font-size:13px;color:#6B7280;line-height:1.6;font-family:${fontStack};">↳&nbsp; ${s}</td></tr>`
+      ).join('');
+      return `<tr><td style="padding:16px 0 4px;font-size:13px;font-weight:700;letter-spacing:0.04em;color:#1C1917;text-transform:uppercase;font-family:${fontStack};">${t.title}</td></tr>${subjectsHtml}`;
+    }).join('');
+    return `
+      <div style="font-family:${fontStack};">
+        <div style="font-size:14px;font-weight:600;color:${badgeClr};letter-spacing:0.06em;text-transform:uppercase;padding:0 0 4px;">${badge}</div>
+        <hr style="border:none;border-top:1px solid #E5E7EB;margin:0 0 8px;" />
+        <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${tracksHtml}</table>
+      </div>`;
+  }
+
   const PRESETS = {
     'two-col-wide':      { rows: [[5, 7]] },
     'three-col':         { rows: [[4, 4, 4]] },

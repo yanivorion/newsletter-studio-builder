@@ -65,6 +65,12 @@ const LAYOUT_PRESETS = {
     textLayout: 'images-then-two-col',
     thumbnail: '/media-kit/layout-two-col-text-side.png',
   },
+  'track-list': {
+    label: 'Track List',
+    images: [],
+    textLayout: 'track-list',
+    thumbnail: '/media-kit/layout-track-list.png',
+  },
 };
 
 function ImagePlaceholder({ height = 180, borderRadius = 12, src, onSetImage }) {
@@ -142,6 +148,52 @@ function ImagePlaceholder({ height = 180, borderRadius = 12, src, onSetImage }) 
   );
 }
 
+const DEFAULT_TRACKS = [
+  {
+    title: 'TITLE PROJECT 01',
+    subjects: ['Subject 01', 'Subject 02', 'Subject 03', 'Subject 04', 'Subject 05', 'Subject 06', 'Subject 07', 'Subject 08'],
+  },
+  {
+    title: 'TITLE PROJECT 02',
+    subjects: ['Subject 01', 'Subject 02', 'Subject 03', 'Subject 04', 'Subject 05', 'Subject 06', 'Subject 07', 'Subject 08'],
+  },
+  {
+    title: 'TITLE PROJECT 03',
+    subjects: ['Subject 01', 'Subject 02', 'Subject 03', 'Subject 04', 'Subject 05', 'Subject 06', 'Subject 07', 'Subject 08'],
+  },
+  {
+    title: 'TITLE PROJECT 04',
+    subjects: ['Subject 01', 'Subject 02', 'Subject 03', 'Subject 04', 'Subject 05', 'Subject 06', 'Subject 07', 'Subject 08'],
+  },
+];
+
+function TrackListLayout({ badgeText, badgeColor, tracks }) {
+  const items = tracks && tracks.length > 0 ? tracks : DEFAULT_TRACKS;
+  return (
+    <div style={{ padding: 0, fontFamily: 'Poppins, sans-serif' }}>
+      <div style={{ marginBottom: 8 }}>
+        <span style={{ display: 'inline-block', fontSize: 14, fontWeight: 600, letterSpacing: '0.06em', color: badgeColor, textTransform: 'uppercase' }}>
+          {badgeText}
+        </span>
+      </div>
+      <hr style={{ border: 'none', borderTop: '1px solid #E5E7EB', margin: '0 0 16px' }} />
+      {items.map((track, ti) => (
+        <div key={ti} style={{ marginBottom: ti < items.length - 1 ? 24 : 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.04em', color: '#1C1917', marginBottom: 8, textTransform: 'uppercase' }}>
+            {track.title}
+          </div>
+          {track.subjects.map((subj, si) => (
+            <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13, color: '#6B7280', lineHeight: 1.6 }}>
+              <span style={{ fontSize: 12, color: '#9CA3AF', flexShrink: 0 }}>↳</span>
+              <span>{subj}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function MultiLayoutBlock({
   layout = 'two-col-wide',
   badgeText = 'BUILDER',
@@ -151,6 +203,7 @@ export default function MultiLayoutBlock({
   images = [],
   imageHeight = 180,
   imageBorderRadius = 12,
+  tracks,
   onSetLayoutImage,
 }) {
   const preset = LAYOUT_PRESETS[layout] || LAYOUT_PRESETS['two-col-wide'];
@@ -239,6 +292,18 @@ export default function MultiLayoutBlock({
       </div>
     </div>
   );
+
+  if (preset.textLayout === 'track-list') {
+    return (
+      <>
+        <TrackListLayout badgeText={badgeText} badgeColor={badgeColor} tracks={tracks} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, padding: '4px 8px', background: '#F4F4F5', borderRadius: 6, width: 'fit-content', fontSize: 10, color: '#71717A' }}>
+          <ChevronDown size={10} />
+          {preset.label}
+        </div>
+      </>
+    );
+  }
 
   return (
     <div style={{ padding: 0, fontFamily: 'Poppins, sans-serif' }}>

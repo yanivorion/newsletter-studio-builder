@@ -2195,43 +2195,110 @@ function SidebarEditor({
         />
       </FieldGroup>
 
-      <FieldGroup label="Title">
-        <EditableInput
-          value={block?.title || ''}
-          onChange={(val) => handleFieldChange('title', val)}
-          sectionKey={selectedSection}
-          placeholder="Section title"
-        />
-      </FieldGroup>
+      {(block?.layout || 'two-col-wide') === 'track-list' ? (
+        <>
+          <FieldGroup label="Tracks">
+            {(block?.tracks || [
+              { title: 'TITLE PROJECT 01', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+              { title: 'TITLE PROJECT 02', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+              { title: 'TITLE PROJECT 03', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+              { title: 'TITLE PROJECT 04', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+            ]).map((track, ti) => (
+              <div key={ti} style={{ marginBottom: 12, padding: 8, background: 'rgba(0,0,0,0.03)', borderRadius: 8 }}>
+                <EditableInput
+                  value={track.title}
+                  onChange={(val) => {
+                    const tracks = [...(block?.tracks || [
+                      { title: 'TITLE PROJECT 01', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+                      { title: 'TITLE PROJECT 02', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+                      { title: 'TITLE PROJECT 03', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+                      { title: 'TITLE PROJECT 04', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+                    ])];
+                    tracks[ti] = { ...tracks[ti], title: val };
+                    handleFieldChange('tracks', tracks);
+                  }}
+                  sectionKey={selectedSection}
+                  placeholder="Track title"
+                />
+                <EditableTextarea
+                  value={track.subjects.join('\n')}
+                  onChange={(val) => {
+                    const tracks = [...(block?.tracks || [
+                      { title: 'TITLE PROJECT 01', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+                      { title: 'TITLE PROJECT 02', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+                      { title: 'TITLE PROJECT 03', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+                      { title: 'TITLE PROJECT 04', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+                    ])];
+                    tracks[ti] = { ...tracks[ti], subjects: val.split('\n').filter(Boolean) };
+                    handleFieldChange('tracks', tracks);
+                  }}
+                  sectionKey={selectedSection}
+                  rows={4}
+                  placeholder="One subject per line"
+                  className="resize-none"
+                  style={{ marginTop: 4, fontSize: 12 }}
+                />
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => {
+                const tracks = [...(block?.tracks || [
+                  { title: 'TITLE PROJECT 01', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+                  { title: 'TITLE PROJECT 02', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+                  { title: 'TITLE PROJECT 03', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+                  { title: 'TITLE PROJECT 04', subjects: ['Subject 01','Subject 02','Subject 03','Subject 04','Subject 05','Subject 06','Subject 07','Subject 08'] },
+                ])];
+                tracks.push({ title: `TITLE PROJECT ${String(tracks.length + 1).padStart(2, '0')}`, subjects: ['Subject 01'] });
+                handleFieldChange('tracks', tracks);
+              }}
+              className="w-full py-1.5 text-xs text-zinc-500 hover:text-zinc-700 border border-dashed border-zinc-300 rounded-md"
+            >
+              + Add Track
+            </button>
+          </FieldGroup>
+        </>
+      ) : (
+        <>
+          <FieldGroup label="Title">
+            <EditableInput
+              value={block?.title || ''}
+              onChange={(val) => handleFieldChange('title', val)}
+              sectionKey={selectedSection}
+              placeholder="Section title"
+            />
+          </FieldGroup>
 
-      <FieldGroup label="Body Text">
-        <EditableTextarea
-          value={block?.body || ''}
-          onChange={(val) => handleFieldChange('body', val)}
-          sectionKey={selectedSection}
-          rows={4}
-          placeholder="Description..."
-          className="resize-none"
-        />
-      </FieldGroup>
+          <FieldGroup label="Body Text">
+            <EditableTextarea
+              value={block?.body || ''}
+              onChange={(val) => handleFieldChange('body', val)}
+              sectionKey={selectedSection}
+              rows={4}
+              placeholder="Description..."
+              className="resize-none"
+            />
+          </FieldGroup>
 
-      <FieldGroup label="Image Height">
-        <NumberInput
-          value={block?.imageHeight || 180}
-          min={80}
-          max={400}
-          onChange={(val) => handleFieldChange('imageHeight', val)}
-        />
-      </FieldGroup>
+          <FieldGroup label="Image Height">
+            <NumberInput
+              value={block?.imageHeight || 180}
+              min={80}
+              max={400}
+              onChange={(val) => handleFieldChange('imageHeight', val)}
+            />
+          </FieldGroup>
 
-      <FieldGroup label="Image Border Radius">
-        <NumberInput
-          value={block?.imageBorderRadius || 12}
-          min={0}
-          max={32}
-          onChange={(val) => handleFieldChange('imageBorderRadius', val)}
-        />
-      </FieldGroup>
+          <FieldGroup label="Image Border Radius">
+            <NumberInput
+              value={block?.imageBorderRadius || 12}
+              min={0}
+              max={32}
+              onChange={(val) => handleFieldChange('imageBorderRadius', val)}
+            />
+          </FieldGroup>
+        </>
+      )}
 
       <FieldGroup label="Images">
         <div className="grid grid-cols-3 gap-2">

@@ -1,29 +1,18 @@
 import React, { useState } from 'react';
-import { 
-  Palette, 
-  Check, 
-  Plus, 
-  X, 
-  Zap, 
-  ZapOff,
+import {
+  Palette,
+  Plus,
+  X,
   Droplets,
   Trash2
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Label } from '../ui/Label';
-import { Badge } from '../ui/Badge';
 import { useTheme } from '../../context/ThemeContext';
-import { cn } from '../../lib/utils';
 
 function ThemePanel({ onSelectColor, onSelectGradient }) {
   const {
-    currentTheme,
-    isElectreonTheme,
-    connectTheme,
-    disconnectTheme,
-    customColors,
-    customGradients,
     addCustomColor,
     removeCustomColor,
     addCustomGradient,
@@ -66,37 +55,6 @@ function ThemePanel({ onSelectColor, onSelectGradient }) {
 
   return (
     <div className="p-4 space-y-6 content-enter">
-      {/* Theme Connection Toggle */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs uppercase tracking-wide text-zinc-500">Brand Theme</Label>
-          <Badge variant={isElectreonTheme ? "default" : "secondary"} className="text-xs">
-            {currentTheme.name}
-          </Badge>
-        </div>
-        
-        <div className="flex gap-2">
-          <Button
-            variant={isElectreonTheme ? "default" : "outline"}
-            size="sm"
-            onClick={connectTheme}
-            className="flex-1"
-          >
-            <Zap className="w-4 h-4" />
-            Electreon
-          </Button>
-          <Button
-            variant={!isElectreonTheme ? "default" : "outline"}
-            size="sm"
-            onClick={disconnectTheme}
-            className="flex-1"
-          >
-            <ZapOff className="w-4 h-4" />
-            Default
-          </Button>
-        </div>
-      </div>
-
       {/* Colors Section */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">

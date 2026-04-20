@@ -5,6 +5,7 @@ import {
   Type,
   Heading,
   Image,
+  Grid2x2,
   LayoutGrid,
   Film,
   MoveHorizontal,
@@ -12,6 +13,9 @@ import {
   Minus,
   ArrowUpDown,
   Columns,
+  LayoutTemplate,
+  PanelBottom,
+  Sparkles,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useStagger } from '../../hooks/useStagger';
@@ -19,7 +23,6 @@ import SectionContainer from './SectionContainer';
 import SectionActionToolbar from './SectionActionToolbar';
 import BlockRenderer from '../blocks/BlockRenderer';
 import GridRow from './GridRow';
-import GridOverlay from './GridOverlay';
 import { isGridSection } from '../../lib/grid-schema';
 import FooterSection from '../sections/FooterSection';
 
@@ -28,9 +31,11 @@ const topBarBlocks = [
   { type: 'text',          label: 'Text',       icon: Type },
   { type: 'title',         label: 'Title',      icon: Heading },
   { type: 'image',         label: 'Image',      icon: Image },
-  { type: 'imageCollage',  label: 'Images',     icon: LayoutGrid },
+  { type: 'imageGrid',     label: 'Images',     icon: Grid2x2 },
+  { type: 'imageCollage',  label: 'Collage',    icon: LayoutGrid },
   { type: 'imageSequence', label: 'Sequence',   icon: Film },
   { type: 'marquee',       label: 'Marquee',    icon: MoveHorizontal },
+  { type: 'animatedText',  label: 'Animated',   icon: Sparkles },
   { type: 'multiLayout',   label: 'Layout',     icon: Columns },
   { type: 'button',        label: 'Button',     icon: MousePointerClick },
   { type: 'divider',       label: 'Divider',    icon: Minus },
@@ -167,7 +172,7 @@ function NewsletterEditor({
   };
 
   const handleSectionDragLeave = (e, sectionId) => {
-    if (isUnlocked) return;
+    if (isUnlocked || !isToolbarDrag(e)) return;
     sectionDropCounters.current[sectionId] = (sectionDropCounters.current[sectionId] || 0) - 1;
     if (sectionDropCounters.current[sectionId] <= 0) {
       sectionDropCounters.current[sectionId] = 0;
@@ -307,7 +312,11 @@ function NewsletterEditor({
           handleSectionDragOver(e, section.id);
         }}
         onDrop={(e) => {
-          if (e.defaultPrevented) return;
+          if (e.defaultPrevented) {
+            setBlockDropTarget(null);
+            sectionDropCounters.current[section.id] = 0;
+            return;
+          }
           if (isToolbarDrag(e)) {
             handleSectionBlockDrop(e, section.id);
           } else {
@@ -380,11 +389,6 @@ function NewsletterEditor({
             setActiveEdges(prev => ({ ...prev, [section.id]: edge }));
           }}
         >
-          {/* Grid overlay — dots appear during drag/resize */}
-          {isGridSection(section) && isSelected && (
-            <GridOverlay visible active={gridInteracting === section.id} />
-          )}
-
           {/* Drop-here overlay when dragging a block from toolbar */}
           {blockDropTarget === section.id && (
             <div style={{
@@ -490,6 +494,11 @@ function NewsletterEditor({
                 e.dataTransfer.setData('application/block-type', type);
                 e.dataTransfer.effectAllowed = 'copy';
               }}
+              onDragEnd={() => {
+                setBlockDropTarget(null);
+                setAddBtnDragOver(null);
+                sectionDropCounters.current = {};
+              }}
               className={cn(
                 "toolbar-block-item flex items-center gap-1 px-2.5 h-8 rounded-lg text-[11px] cursor-grab active:cursor-grabbing select-none",
                 "text-zinc-500 hover:text-zinc-900 hover:bg-white/80"
@@ -540,6 +549,22 @@ function NewsletterEditor({
               onSectionClick(null);
             }
           }}
+          onDragOver={(e) => {
+            if (isUnlocked) return;
+            if (!e.dataTransfer.types.includes('application/block-type')) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+          }}
+          onDrop={(e) => {
+            if (isUnlocked) return;
+            if (e.defaultPrevented) return;
+            const blockType = e.dataTransfer.getData('application/block-type');
+            if (!blockType) return;
+            e.preventDefault();
+            e.stopPropagation();
+            setBlockDropTarget(null);
+            onInsertSection?.(newsletter.sections.length, blockType);
+          }}
           style={{
             backgroundColor: newsletter.pageSettings?.outerBackgroundColor || '#F5F5F5',
             padding: `${newsletter.pageSettings?.outerPadding || 20}px`,
@@ -560,17 +585,83 @@ function NewsletterEditor({
               overflow: 'visible',
             }}
           >
-            {newsletter.sections.map((section, index) => (
-              <React.Fragment key={section.id}>
-                {renderSection(section, index)}
-                {renderAddButton(index + 1)}
-              </React.Fragment>
-            ))}
+            {(() => {
+              const hasHeader = newsletter.sections.some((s) => s.type === 'header');
+              const hasFooter = newsletter.sections.some((s) => s.type === 'footer');
+              return (
+                <>
+                  {!hasHeader && (
+                    <SlotAddButton
+                      label="Add Header"
+                      icon={LayoutTemplate}
+                      onClick={() => onAddSection?.('header')}
+                    />
+                  )}
 
-            {newsletter.sections.length === 0 && renderAddButton(0)}
+                  {newsletter.sections.map((section, index) => (
+                    <React.Fragment key={section.id}>
+                      {index > 0 && (newsletter.pageSettings?.sectionGap ?? 16) > 0 && (
+                        <div style={{ height: `${newsletter.pageSettings?.sectionGap ?? 16}px` }} />
+                      )}
+                      {renderSection(section, index)}
+                      {renderAddButton(index + 1)}
+                    </React.Fragment>
+                  ))}
+
+                  {newsletter.sections.length === 0 && renderAddButton(0)}
+
+                  {!hasFooter && (
+                    <SlotAddButton
+                      label="Add Footer"
+                      icon={PanelBottom}
+                      onClick={() => onAddSection?.('footer')}
+                    />
+                  )}
+                </>
+              );
+            })()}
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Slot button to add back a missing Header or Footer ──
+function SlotAddButton({ label, icon: Icon, onClick }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0' }}>
+      <button
+        type="button"
+        onClick={onClick}
+        className="btn-spring"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '8px 14px',
+          borderRadius: 999,
+          background: 'rgba(4,209,252,0.08)',
+          border: '1px dashed rgba(4,209,252,0.45)',
+          color: '#0284A8',
+          fontSize: 12,
+          fontWeight: 500,
+          cursor: 'pointer',
+          transition: 'all 180ms cubic-bezier(0.22, 1, 0.36, 1)',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'rgba(4,209,252,0.14)';
+          e.currentTarget.style.borderColor = 'rgba(4,209,252,0.7)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'rgba(4,209,252,0.08)';
+          e.currentTarget.style.borderColor = 'rgba(4,209,252,0.45)';
+        }}
+      >
+        <Plus size={13} strokeWidth={2.2} />
+        <Icon size={13} strokeWidth={2} />
+        <span>{label}</span>
+      </button>
     </div>
   );
 }

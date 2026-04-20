@@ -16,9 +16,22 @@
  *   5. Return the email-ready newsletter
  */
 
-import { exportMarqueeAsGif } from './sequenceGifExport';
+import {
+  exportMarqueeAsGif,
+  exportAnimatedTextAsGif,
+  exportKineticMarqueeAsGif,
+  exportSequenceAsGif,
+} from './sequenceGifExport';
 
-const DYNAMIC_BLOCK_TYPES = ['marquee', 'imageSequence'];
+const DYNAMIC_BLOCK_TYPES = ['marquee', 'imageSequence', 'animatedText'];
+const KINETIC_MARQUEE_PRESETS = new Set([
+  'marquee-horizontal',
+  'marquee-diagonal',
+  'variable-scale',
+  'kinetic-stack',
+  'dual-word',
+  'tag-marquee',
+]);
 
 // ---------------------------------------------------------------------------
 // 1. Find all dynamic blocks across flat-blocks and grid modes
@@ -84,7 +97,7 @@ async function captureBlockAsImage(blockId) {
   const html2canvas = (await import('html2canvas')).default;
 
   const wrapper = document.querySelector(`[data-block-id="${blockId}"]`);
-  if (!wrapper) throw new Error(`Block element not found in DOM: ${blockId}`);
+  if (!wrapper) return null;
 
   const contentEl = wrapper.firstElementChild || wrapper;
 
@@ -155,8 +168,8 @@ async function uploadCapturedImage(dataUrl, userId) {
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Upload failed (${res.status})`);
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody.error || `Upload failed (${res.status})`);
   }
 
   return res.json();
@@ -196,17 +209,68 @@ export async function convertNewsletterForEmail(newsletter, options = {}) {
 
   for (let i = 0; i < total; i++) {
     const { blockId, block } = dynamicBlocks[i];
-    const label = block.type === 'marquee' ? 'Marquee' : 'Image Sequence';
+    const label = block.type === 'marquee'
+      ? 'Marquee'
+      : block.type === 'animatedText'
+        ? 'Animated Text'
+        : 'Image Sequence';
 
     onProgress?.({ step: 'capture', current: i + 1, total, label });
 
     try {
       let uploaded;
 
-      if (block.type === 'marquee') {
+      if (block.type === 'animatedText') {
         let gifResult = null;
         try {
-          gifResult = await exportMarqueeAsGif(block, { width: 700 });
+          gifResult = await exportAnimatedTextAsGif(block, { width: 700 });
+        } catch (gifErr) {
+          console.error(`[convert] animatedText GIF generation failed (${blockId}):`, gifErr);
+        }
+
+        onProgress?.({ step: 'upload', current: i + 1, total, label });
+
+        if (gifResult?.blob) {
+          const formData = new FormData();
+          formData.append('file', gifResult.blob, `animated-text-${Date.now()}.gif`);
+          const res = await fetch('/api/images/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+          uploaded = await res.json();
+
+          replacements[blockId] = {
+            type: 'image',
+            id: blockId,
+            src: uploaded.url,
+            alt: block.text || 'Animated text',
+            borderRadius: 0,
+            _convertedFrom: 'animatedText',
+            _originalHeight: gifResult.height,
+          };
+        } else {
+          const capture = await captureBlockAsImage(blockId);
+          if (!capture) continue;
+          uploaded = await uploadCapturedImage(capture.dataUrl, userId);
+          replacements[blockId] = {
+            type: 'image',
+            id: blockId,
+            src: uploaded.url,
+            alt: block.text || 'Animated text',
+            borderRadius: 0,
+            _convertedFrom: 'animatedText',
+            _originalHeight: capture.height,
+          };
+        }
+      } else if (block.type === 'marquee') {
+        let gifResult = null;
+        try {
+          if (KINETIC_MARQUEE_PRESETS.has(block.preset)) {
+            gifResult = await exportKineticMarqueeAsGif(block, { width: 700 });
+          } else {
+            gifResult = await exportMarqueeAsGif(block, { width: 700 });
+          }
         } catch (gifErr) {
           console.warn(`GIF generation failed for marquee (${blockId}), falling back to screenshot:`, gifErr.message);
         }
@@ -233,8 +297,8 @@ export async function convertNewsletterForEmail(newsletter, options = {}) {
             _originalHeight: gifResult.height,
           };
         } else {
-          // Fallback: screenshot the live DOM element as a static image
           const capture = await captureBlockAsImage(blockId);
+          if (!capture) continue;
           uploaded = await uploadCapturedImage(capture.dataUrl, userId);
 
           replacements[blockId] = {
@@ -247,8 +311,60 @@ export async function convertNewsletterForEmail(newsletter, options = {}) {
             _originalHeight: capture.height,
           };
         }
+      } else if (block.type === 'imageSequence') {
+        const validImages = (block.images || []).filter(Boolean);
+        let gifBlob = null;
+
+        if (validImages.length >= 2) {
+          try {
+            gifBlob = await exportSequenceAsGif(validImages, {
+              width: 700,
+              height: block.previewHeight || 400,
+              delay: block.frameDuration || 500,
+            });
+          } catch (gifErr) {
+            console.warn(`GIF generation failed for imageSequence (${blockId}), falling back to screenshot:`, gifErr.message);
+          }
+        }
+
+        onProgress?.({ step: 'upload', current: i + 1, total, label });
+
+        if (gifBlob) {
+          const formData = new FormData();
+          formData.append('file', gifBlob, `sequence-${Date.now()}.gif`);
+          const res = await fetch('/api/images/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+          uploaded = await res.json();
+
+          replacements[blockId] = {
+            type: 'image',
+            id: blockId,
+            src: uploaded.url,
+            alt: 'Image sequence animation',
+            borderRadius: 0,
+            _convertedFrom: 'imageSequence',
+          };
+        } else {
+          const capture = await captureBlockAsImage(blockId);
+          if (!capture) continue;
+          uploaded = await uploadCapturedImage(capture.dataUrl, userId);
+
+          replacements[blockId] = {
+            type: 'image',
+            id: blockId,
+            src: uploaded.url,
+            alt: 'Image sequence',
+            borderRadius: 0,
+            _convertedFrom: 'imageSequence',
+            _originalHeight: capture.height,
+          };
+        }
       } else {
         const capture = await captureBlockAsImage(blockId);
+        if (!capture) continue;
         onProgress?.({ step: 'upload', current: i + 1, total, label });
         uploaded = await uploadCapturedImage(capture.dataUrl, userId);
 
@@ -263,7 +379,7 @@ export async function convertNewsletterForEmail(newsletter, options = {}) {
         };
       }
     } catch (err) {
-      console.error(`Conversion failed for ${label} (${blockId}):`, err);
+      console.warn(`Conversion skipped for ${label} (${blockId}):`, err.message);
       onProgress?.({
         step: 'error',
         current: i + 1,

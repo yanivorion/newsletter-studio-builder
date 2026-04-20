@@ -223,7 +223,6 @@ function SectionContainer({
         </>
       )}
 
-      {/* Background image as real <img> for email compatibility */}
       {hasBgImage && (
         <img
           src={background.image}
@@ -237,6 +236,7 @@ function SectionContainer({
             objectPosition: background.imagePosition || 'center',
             pointerEvents: 'none',
             display: 'block',
+            backgroundColor: 'inherit',
           }}
         />
       )}

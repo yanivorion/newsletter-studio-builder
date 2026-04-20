@@ -40,7 +40,7 @@ export default function ImageBlock({
             flexDirection: 'column',
             alignItems: 'center',
             gap: 6,
-            color: hovered && canSet ? '#04D1FC' : 'currentColor',
+            color: hovered && canSet ? '#04D1FC' : '#A1A1AA',
             opacity: hovered ? 0.8 : 0.45,
             transition: 'all 200ms',
           }}
@@ -56,8 +56,9 @@ export default function ImageBlock({
 
   if (!src) return null;
 
-  const needsAlign = width && width !== '100%';
-  const alignMap = { left: 'flex-start', center: 'center', right: 'flex-end' };
+  const resolvedHeight = typeof height === 'number' ? height : 200;
+  const resolvedWidth = typeof width === 'number' ? width : '100%';
+  const fitMode = objectFit || 'cover';
 
   return (
     <div
@@ -65,22 +66,18 @@ export default function ImageBlock({
       onMouseLeave={() => setHovered(false)}
       style={{
         position: 'relative',
+        width: resolvedWidth,
+        height: resolvedHeight,
         borderRadius,
         overflow: 'hidden',
-        ...(needsAlign ? { display: 'flex', justifyContent: alignMap[alignment] || 'center' } : {}),
+        backgroundImage: `url(${src})`,
+        backgroundSize: fitMode === 'contain' ? 'contain' : 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
       }}
+      role="img"
+      aria-label={alt}
     >
-      <img
-        src={src}
-        alt={alt}
-        style={{
-          display: 'block',
-          width: typeof width === 'number' ? width : width,
-          height: typeof height === 'number' ? height : height,
-          objectFit,
-          borderRadius,
-        }}
-      />
       {hovered && onSetImage && (
         <div
           onClick={(e) => { e.stopPropagation(); onSetImage(); }}

@@ -1,4 +1,7 @@
-@import "tailwindcss";
+@import "tailwindcss" source("../");
+@source not "../../node_modules 2";
+@source not "../../.next-old";
+@source not "../../dist";
 
 :root {
   /* ── Colors ── */

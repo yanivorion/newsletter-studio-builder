@@ -19,6 +19,8 @@ import FooterLinksBlock from './FooterLinksBlock';
 import CompanyInfoBlock from './CompanyInfoBlock';
 import TitleBlock from './TitleBlock';
 import MultiLayoutBlock from './MultiLayoutBlock';
+import ImageGridBlock from './ImageGridBlock';
+import AnimatedTextBlock from './AnimatedTextBlock';
 
 // Maps block.type → React component.
 // Existing section components are reused directly; simple blocks are new.
@@ -26,9 +28,11 @@ const blockComponents = {
   text:          TextSection,
   title:         TitleBlock,
   image:         ImageBlock,
+  imageGrid:     ImageGridBlock,
   imageCollage:  ImageCollageSection,
   imageSequence: ImageSequenceSection,
   marquee:       MarqueeSection,
+  animatedText:  AnimatedTextBlock,
   promoCard:     PromoCardSection,
   profileCards:  ProfileCardsSection,
   recipe:        RecipeSection,
@@ -99,7 +103,7 @@ export default function BlockRenderer({
         sectionBackground={sectionBackground}
         onSetImage={block.type === 'image' ? onSetImage : undefined}
         onSetCollageImage={block.type === 'imageCollage' ? onSetCollageImage : undefined}
-        onSetLayoutImage={block.type === 'multiLayout' ? onSetLayoutImage : undefined}
+        onSetLayoutImage={(block.type === 'multiLayout' || block.type === 'imageGrid') ? onSetLayoutImage : undefined}
       />
     </div>
   );

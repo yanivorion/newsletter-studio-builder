@@ -8,6 +8,7 @@ import {
   Settings, LogOut, Menu, X,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import UserMenu from '@/components/editor/UserMenu';
 
 function LogoutButton() {
   const { signOut } = useAuth();
@@ -38,9 +39,6 @@ function LogoutButton() {
 
 const navItems = [
   { href: '/dashboard', icon: PenTool, label: 'Newsletters', match: /^\/dashboard$/ },
-  { href: '/dashboard/campaigns', icon: Send, label: 'Campaigns', match: /^\/dashboard\/campaigns/ },
-  { href: '/dashboard/subscribers', icon: Users, label: 'Subscribers', match: /^\/dashboard\/subscribers/ },
-  { href: '/dashboard/analytics', icon: BarChart3, label: 'Analytics', match: /^\/dashboard\/analytics/ },
 ];
 
 export default function DashboardLayout({ children }) {
@@ -197,11 +195,24 @@ export default function DashboardLayout({ children }) {
         style={{
           flex: 1,
           marginLeft: 220,
-          padding: '24px 32px',
           minHeight: '100vh',
         }}
       >
-        {children}
+        {/* Top bar with UserMenu */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            padding: '12px 32px',
+            borderBottom: '1px solid var(--border)',
+            background: 'rgba(255,255,255,0.4)',
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          <UserMenu />
+        </div>
+        <div style={{ padding: '24px 32px' }}>{children}</div>
       </main>
     </div>
   );

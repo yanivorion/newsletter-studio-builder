@@ -818,13 +818,15 @@ function sectionBgAttr(bg, innerBg) {
   return `background-color="${innerBg || '#FFFFFF'}"`;
 }
 
-function renderContainerSection(section, innerBg) {
+function renderContainerSection(section, innerBg, { isFirst = false, sectionPaddingTop = 20 } = {}) {
   const bg = section.background || {};
   const pad = section.padding || {};
-  const pt = pad.top ?? 24;
+  const extraTop = !isFirst ? sectionPaddingTop : 0;
+  const pt = (pad.top ?? 24) + extraTop;
   const pb = pad.bottom ?? 24;
   const pl = pad.left ?? 24;
   const pr = pad.right ?? 24;
+  const br = section.borderRadius ?? 0;
 
   const bgAttr = sectionBgAttr(bg, innerBg);
 
@@ -832,15 +834,11 @@ function renderContainerSection(section, innerBg) {
   const minH = section.minHeight ? parseInt(section.minHeight, 10) : 0;
   const targetH = fixedH || minH;
 
-  function wrapWithHeight(mjml) {
-    if (!targetH) return mjml;
-    return mjml.replace(
-      /(<mj-section\b)/,
-      `$1 css-class="sec-h-${section.id}"`
-    );
-  }
+  const cssClasses = [];
+  if (targetH) cssClasses.push(`sec-h-${section.id}`);
+  if (br > 0) cssClasses.push(`sec-br-${section.id}`);
+  const cssClassAttr = cssClasses.length > 0 ? ` css-class="${cssClasses.join(' ')}"` : '';
 
-  // Grid mode: section has multi-column rows → must use mj-wrapper
   if (Array.isArray(section.rows) && section.rows.length > 0) {
     const hasMultiColumn = section.rows.some(r =>
       r.columns && r.columns.length > 1
@@ -852,12 +850,11 @@ function renderContainerSection(section, innerBg) {
         .filter(Boolean)
         .join('\n');
       return `
-    <mj-wrapper ${bgAttr} padding="${pt}px ${pr}px ${pb}px ${pl}px"${targetH ? ` css-class="sec-h-${section.id}"` : ''}>
+    <mj-wrapper ${bgAttr} padding="${pt}px ${pr}px ${pb}px ${pl}px"${cssClassAttr}>
       ${rowsMarkup}
     </mj-wrapper>`;
     }
 
-    // Single-column grid rows → flatten to mj-section for better Gmail compat
     const allBlocks = [];
     for (const row of section.rows) {
       for (const col of (row.columns || [])) {
@@ -870,46 +867,47 @@ function renderContainerSection(section, innerBg) {
       .map(b => blockToColumnContent(b))
       .filter(Boolean)
       .join('\n        ');
-    return wrapWithHeight(`
-    <mj-section ${bgAttr} padding="${pt}px ${pr}px ${pb}px ${pl}px">
+    return `
+    <mj-section ${bgAttr} padding="${pt}px ${pr}px ${pb}px ${pl}px"${cssClassAttr}>
       <mj-column>
         ${content || '<mj-text padding="0">&nbsp;</mj-text>'}
       </mj-column>
-    </mj-section>`);
+    </mj-section>`;
   }
 
-  // Flat blocks mode → single mj-section (most Gmail-compatible)
   const content = (section.blocks || [])
     .map(b => blockToColumnContent(b))
     .filter(Boolean)
     .join('\n        ');
 
-  return wrapWithHeight(`
-    <mj-section ${bgAttr} padding="${pt}px ${pr}px ${pb}px ${pl}px">
+  return `
+    <mj-section ${bgAttr} padding="${pt}px ${pr}px ${pb}px ${pl}px"${cssClassAttr}>
       <mj-column>
         ${content || '<mj-text padding="0">&nbsp;</mj-text>'}
       </mj-column>
-    </mj-section>`);
+    </mj-section>`;
 }
 
-function sectionToMjml(section, innerBg) {
-  // New-format sections have blocks or rows
+function sectionToMjml(section, innerBg, { isFirst = false, sectionPaddingTop = 20 } = {}) {
   if (Array.isArray(section.rows) || Array.isArray(section.blocks)) {
-    return renderContainerSection(section, innerBg);
+    return renderContainerSection(section, innerBg, { isFirst, sectionPaddingTop });
   }
 
-  // Legacy format fallback
+  const spacer = !isFirst
+    ? `\n    <mj-section background-color="transparent" padding="0"><mj-column><mj-spacer height="${sectionPaddingTop}px" /></mj-column></mj-section>`
+    : '';
+
   switch (section.type) {
     case 'header': return renderHeader(section);
-    case 'marquee': return renderMarquee(section);
-    case 'text': return renderText(section);
-    case 'sectionHeader': return renderSectionHeader(section);
-    case 'accentText': return renderAccentText(section);
-    case 'promoCard': return renderPromoCard(section);
-    case 'imageCollage': return renderImageCollage(section);
-    case 'profileCards': return renderProfileCards(section);
-    case 'recipe': return renderRecipe(section);
-    case 'footer': return renderFooter(section);
+    case 'marquee': return spacer + renderMarquee(section);
+    case 'text': return spacer + renderText(section);
+    case 'sectionHeader': return spacer + renderSectionHeader(section);
+    case 'accentText': return spacer + renderAccentText(section);
+    case 'promoCard': return spacer + renderPromoCard(section);
+    case 'imageCollage': return spacer + renderImageCollage(section);
+    case 'profileCards': return spacer + renderProfileCards(section);
+    case 'recipe': return spacer + renderRecipe(section);
+    case 'footer': return spacer + renderFooter(section);
     default: return '';
   }
 }
@@ -922,11 +920,17 @@ export function newsletterToMjml(newsletter, options = {}) {
   const pageSettings = newsletter.pageSettings || {};
   const outerBg = pageSettings.outerBackgroundColor || '#F5F5F5';
   const innerBg = pageSettings.innerBackgroundColor || '#FFFFFF';
+  const sectionGap = pageSettings.sectionGap ?? 16;
+  const sectionPaddingTop = pageSettings.sectionPaddingTop ?? 20;
+
+  const gapMjml = sectionGap > 0
+    ? `\n    <mj-section background-color="${innerBg}" padding="0"><mj-column><mj-spacer height="${sectionGap}px" /></mj-column></mj-section>\n`
+    : '\n';
 
   const sectionsMarkup = newsletter.sections
-    .map(section => sectionToMjml(section, innerBg))
+    .map((section, idx) => sectionToMjml(section, innerBg, { isFirst: idx === 0, sectionPaddingTop }))
     .filter(Boolean)
-    .join('\n');
+    .join(gapMjml);
 
   const heightStyles = newsletter.sections
     .filter(s => {
@@ -943,6 +947,13 @@ export function newsletterToMjml(newsletter, options = {}) {
     })
     .join('\n          ');
 
+  const radiusStyles = newsletter.sections
+    .filter(s => (s.borderRadius ?? 0) > 0)
+    .map(s => `.sec-br-${s.id} { border-radius: ${s.borderRadius}px !important; overflow: hidden !important; }`)
+    .join('\n          ');
+
+  const dynamicStyles = [heightStyles, radiusStyles].filter(Boolean).join('\n          ');
+
   return `
     <mjml>
       <mj-head>
@@ -955,10 +966,10 @@ export function newsletterToMjml(newsletter, options = {}) {
         <mj-style>
           ${FONT_FACE}
           .rtl-text div { direction: rtl; }
-          ${heightStyles}
+          ${dynamicStyles}
         </mj-style>
         <mj-style inline="inline">
-          ${heightStyles}
+          ${dynamicStyles}
         </mj-style>
         ${previewText ? `<mj-preview>${previewText}</mj-preview>` : ''}
       </mj-head>

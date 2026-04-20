@@ -7,43 +7,49 @@ const LAYOUT_PRESETS = {
     label: 'Text Only',
     images: [],
     textLayout: 'full',
-    thumbnail: '/media-kit/layout-text-only.png',
+    thumbnail: '/media-kit/intro-8.png',
   },
   'text-centered': {
     label: 'Centered Text',
     images: [],
     textLayout: 'centered',
-    thumbnail: '/media-kit/layout-text-centered.png',
+    thumbnail: '/media-kit/intro-9.png',
   },
   'text-list': {
     label: 'Text + List',
     images: [],
     textLayout: 'full',
-    thumbnail: '/media-kit/layout-text-list.png',
+    thumbnail: '/media-kit/intro-10.png',
   },
   'hero-text': {
     label: 'Hero + Text',
     images: [{ span: 12 }],
     textLayout: 'full',
-    thumbnail: '/media-kit/layout-hero-text.png',
+    thumbnail: '/media-kit/intro-2.png',
   },
   'hero-repeat': {
-    label: 'Image + Text Rows',
+    label: 'Image + Text Rows (3×)',
     images: [{ span: 5 }, { span: 5 }, { span: 5 }],
     textLayout: 'repeat-side',
-    thumbnail: '/media-kit/layout-hero-repeat.png',
+    thumbnail: '/media-kit/intro-5.png',
+  },
+  'hero-repeat-2': {
+    label: 'Image + Text Rows (2×)',
+    images: [{ span: 5 }, { span: 5 }],
+    textLayout: 'repeat-side',
+    thumbnail: '/media-kit/intro-6.png',
   },
   'hero-side': {
-    label: 'Hero + Side Text',
-    images: [{ span: 5 }],
-    textLayout: 'two-col',
-    thumbnail: '/media-kit/layout-hero-side.png',
+    label: 'Hero + Split Text',
+    images: [{ span: 12 }],
+    textLayout: 'images-then-two-col',
+    thumbnail: '/media-kit/intro-1.png',
   },
   'three-col': {
     label: '3 Columns',
     images: [{ span: 4 }, { span: 4 }, { span: 4 }],
     textLayout: 'full',
-    thumbnail: '/media-kit/layout-three-col.png',
+    thumbnail: '/media-kit/intro-4.png',
   },
   'two-by-two': {
     label: '2×2 Grid',
@@ -52,38 +58,37 @@ const LAYOUT_PRESETS = {
       [{ span: 6 }, { span: 6 }],
     ],
     textLayout: 'full',
-    thumbnail: '/media-kit/layout-two-by-two.png',
+    thumbnail: '/media-kit/intro-12.png',
   },
   'two-col-wide': {
     label: '2 Columns (5/7)',
     images: [{ span: 5 }, { span: 7 }],
     textLayout: 'full',
-    thumbnail: '/media-kit/layout-two-col-wide.png',
+    thumbnail: '/media-kit/intro-11.png',
   },
   'two-col-equal': {
     label: '2 Columns (Equal)',
     images: [{ span: 6 }, { span: 6 }],
     textLayout: 'full',
-    thumbnail: '/media-kit/layout-two-col-equal.png',
+    thumbnail: '/media-kit/intro-3.png',
   },
   'two-col-text-side': {
-    label: '2 Columns + Side Text',
+    label: '2 Columns + 2 Text Blocks',
     images: [{ span: 6 }, { span: 6 }],
-    textLayout: 'images-then-two-col',
-    thumbnail: '/media-kit/layout-two-col-text-side.png',
+    textLayout: 'images-then-two-col-pairs',
+    thumbnail: '/media-kit/intro-7.png',
   },
   'hero-above': {
-    label: 'Hero Above Badge',
-    images: [{ span: 12 }],
-    textLayout: 'full',
-    imageAboveBadge: true,
-    thumbnail: '/media-kit/layout-hero-above.png',
+    label: '2 Images + Split Text',
+    images: [{ span: 6 }, { span: 6 }],
+    textLayout: 'images-then-two-col',
+    thumbnail: '/media-kit/intro.png',
   },
   'track-list': {
     label: 'Track List',
     images: [],
     textLayout: 'track-list',
-    thumbnail: '/media-kit/layout-track-list.png',
+    thumbnail: '/media-kit/layout-track-list.svg',
   },
 };
 
@@ -181,16 +186,20 @@ const DEFAULT_TRACKS = [
   },
 ];
 
-function TrackListLayout({ badgeText, badgeColor, tracks, badgeFontSize = 19, titleFontSize = 17, bodyFontSize = 15 }) {
+function TrackListLayout({ badgeText, badgeColor, showBadge = true, tracks, badgeFontSize = 19, titleFontSize = 17, bodyFontSize = 15 }) {
   const items = tracks && tracks.length > 0 ? tracks : DEFAULT_TRACKS;
   return (
     <div style={{ padding: 0, fontFamily: 'Poppins, sans-serif' }}>
-      <div style={{ marginBottom: 8 }}>
-        <span style={{ display: 'inline-block', fontSize: badgeFontSize, fontWeight: 600, letterSpacing: '0.06em', color: badgeColor, textTransform: 'uppercase' }}>
-          {badgeText}
-        </span>
-      </div>
-      <hr style={{ border: 'none', borderTop: '1px solid #E5E7EB', margin: '0 0 16px' }} />
+      {showBadge && (
+        <>
+          <div style={{ marginBottom: 8 }}>
+            <span style={{ display: 'inline-block', fontSize: badgeFontSize, fontWeight: 600, letterSpacing: '0.06em', color: badgeColor, textTransform: 'uppercase' }}>
+              {badgeText}
+            </span>
+          </div>
+          <hr style={{ border: 'none', borderTop: '1px solid #E5E7EB', margin: '0 0 16px' }} />
+        </>
+      )}
       {items.map((track, ti) => (
         <div key={ti} style={{ marginBottom: ti < items.length - 1 ? 24 : 0 }}>
           <div style={{ fontSize: titleFontSize, fontWeight: 700, letterSpacing: '0.04em', color: '#1C1917', marginBottom: 8, textTransform: 'uppercase' }}>
@@ -212,6 +221,7 @@ export default function MultiLayoutBlock({
   layout = 'two-col-wide',
   badgeText = 'BUILDER',
   badgeColor = '#1a1a3e',
+  showBadge = true,
   title = 'THE LOOK & FEEL OF STUDIO 2.0',
   body = 'The first real look at the Studio 2.0 editor shell. Top Bar, Side Bar, and Side Panels live and interactive.',
   images = [],
@@ -276,10 +286,25 @@ export default function MultiLayoutBlock({
     </div>
   );
 
+  const renderTextTwoColPairs = () => (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '8px 0 0' }}>
+      {[0, 1].map((i) => (
+        <div key={i}>
+          <div style={{ fontSize: titleFontSize, fontWeight: 700, letterSpacing: '0.03em', color: '#1C1917', lineHeight: 1.3, marginBottom: 6 }}>
+            {linkedTitle}
+          </div>
+          <div style={{ fontSize: bodyFontSize, color: '#6B7280', lineHeight: 1.65, fontFamily: 'Poppins, sans-serif' }}>
+            {linkedBody}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
   if (preset.textLayout === 'track-list') {
     return (
       <>
-        <TrackListLayout badgeText={badgeText} badgeColor={badgeColor} tracks={tracks} badgeFontSize={badgeFontSize} titleFontSize={titleFontSize} bodyFontSize={bodyFontSize} />
+        <TrackListLayout badgeText={badgeText} badgeColor={badgeColor} showBadge={showBadge} tracks={tracks} badgeFontSize={badgeFontSize} titleFontSize={titleFontSize} bodyFontSize={bodyFontSize} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, padding: '4px 8px', background: '#F4F4F5', borderRadius: 6, width: 'fit-content', fontSize: 10, color: '#71717A' }}>
           <ChevronDown size={10} />
           {preset.label}
@@ -288,7 +313,7 @@ export default function MultiLayoutBlock({
     );
   }
 
-  const badgeBlock = (
+  const badgeBlock = showBadge ? (
     <>
       <div style={{ marginBottom: 8 }}>
         <span
@@ -306,7 +331,7 @@ export default function MultiLayoutBlock({
       </div>
       <hr style={{ border: 'none', borderTop: '1px solid #E5E7EB', margin: '0 0 12px' }} />
     </>
-  );
+  ) : null;
 
   const heroAboveImages = preset.imageAboveBadge && preset.images && preset.images.length > 0;
 
@@ -373,7 +398,9 @@ export default function MultiLayoutBlock({
               <div style={{ fontSize: titleFontSize, fontWeight: 700, letterSpacing: '0.03em', color: '#1C1917', lineHeight: 1.3, marginBottom: 6 }}>{linkedTitle}</div>
               <div style={{ fontSize: bodyFontSize, color: '#6B7280', lineHeight: 1.65, fontFamily: 'Poppins, sans-serif' }}>{linkedBody}</div>
             </div>
-          ) : preset.textLayout === 'images-then-two-col' ? renderTextTwoCol() : renderTextFull()}
+          ) : preset.textLayout === 'images-then-two-col-pairs' ? renderTextTwoColPairs()
+            : preset.textLayout === 'images-then-two-col' ? renderTextTwoCol()
+            : renderTextFull()}
         </>
       )}
 

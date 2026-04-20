@@ -11,8 +11,18 @@
  * This runs server-side (API route) for sharp processing.
  */
 
-import sharp from 'sharp';
 import { getSupabaseAdmin } from './supabase-client';
+
+// Lazy-load sharp so routes that import this module but don't actually
+// process images (e.g. GET /api/media listing) don't trip the native
+// binding at module-evaluation time.
+let _sharp;
+async function getSharp() {
+  if (!_sharp) {
+    _sharp = (await import('sharp')).default;
+  }
+  return _sharp;
+}
 
 const BUCKET_NAME = 'newsletter-images';
 const MAX_WIDTH = 1200;
@@ -33,6 +43,7 @@ export async function processAndUploadImage(buffer, options = {}) {
     format = 'jpeg',
   } = options;
 
+  const sharp = await getSharp();
   const image = sharp(buffer);
   const metadata = await image.metadata();
 
@@ -53,7 +64,7 @@ export async function processAndUploadImage(buffer, options = {}) {
   }
 
   const optimizedBuffer = await pipeline.toBuffer();
-  const optimizedMeta = await sharp(optimizedBuffer).metadata();
+  const optimizedMeta = await (await getSharp())(optimizedBuffer).metadata();
 
   const ext = format === 'jpeg' ? 'jpg' : format;
   const finalFilename = filename || `${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;

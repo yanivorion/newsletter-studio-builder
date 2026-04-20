@@ -34,31 +34,51 @@ import FocalPointPicker from './FocalPointPicker';
 import BulkImageUploader from './BulkImageUploader';
 import { getPresetById, getImageCountForPreset } from '../../lib/collagePresets';
 import { exportToGif, downloadDataUrl } from '../../utils/gifExport';
-import { exportSequenceAsGif, exportMarqueeAsGif, downloadBlob } from '../../utils/sequenceGifExport';
-import { IconPickerButton } from './IconPicker';
 import {
-  isGridSection,
-  ROW_LAYOUTS,
-  createGridRow,
-  createGridColumn,
-  blocksToRows,
-  splitColumn,
-  mergeColumns,
-} from '../../lib/grid-schema';
+  exportSequenceAsGif,
+  exportMarqueeAsGif,
+  exportAnimatedTextAsGif,
+  exportBlockAsGifFromDOM,
+  downloadBlob,
+} from '../../utils/sequenceGifExport';
+import { IconPickerButton } from './IconPicker';
+import { isGridSection } from '../../lib/grid-schema';
 import { LAYOUT_PRESETS } from '../blocks/MultiLayoutBlock';
 
 const REMOVE_BG_API_KEY = 'rDrPT41QWFrheRJc4MARam3m';
 
-function LocalInput({ value, onSave, placeholder, className }) {
+function LocalInput({ value, onSave, placeholder, className, live = false, debounceMs = 0 }) {
   const [local, setLocal] = useState(value);
   useEffect(() => { setLocal(value); }, [value]);
+  const timerRef = useRef(null);
+
+  const flush = (next) => {
+    if (next !== value) onSave(next);
+  };
+
+  const handleChange = (e) => {
+    const next = e.target.value;
+    setLocal(next);
+    if (live) {
+      if (debounceMs > 0) {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => flush(next), debounceMs);
+      } else {
+        flush(next);
+      }
+    }
+  };
+
   return (
     <input
       type="text"
       value={local}
-      onChange={(e) => setLocal(e.target.value)}
-      onBlur={() => { if (local !== value) onSave(local); }}
-      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (local !== value) onSave(local); } }}
+      onChange={handleChange}
+      onBlur={() => {
+        if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+        flush(local);
+      }}
+      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); flush(local); } }}
       placeholder={placeholder}
       className={className}
     />
@@ -133,6 +153,13 @@ function ImageColorPicker({ value, onChange, placeholder = 'Enter color', allowC
   );
 }
 
+const FieldGroup = ({ label, children, className }) => (
+  <div className={cn("space-y-2", className)}>
+    <Label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">{label}</Label>
+    {children}
+  </div>
+);
+
 function SidebarEditor({ 
   newsletter, 
   selectedSection, 
@@ -204,26 +231,54 @@ function SidebarEditor({
     container.addEventListener('focusin', preventScrollJump);
     return () => container.removeEventListener('focusin', preventScrollJump);
   }, []);
-  
+
+  // When a block is selected, scroll the canvas to it and flash a highlight.
+  // Prevents editing the wrong block when multiple blocks of the same type exist.
+  useEffect(() => {
+    if (!selectedBlock) return;
+    const el = document.querySelector(`[data-block-id="${selectedBlock}"]`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const originalShadow = el.style.boxShadow;
+    const originalTransition = el.style.transition;
+    el.style.transition = 'box-shadow 0.3s';
+    el.style.boxShadow = '0 0 0 4px rgba(4,209,252,0.7)';
+    const t = setTimeout(() => {
+      el.style.boxShadow = originalShadow;
+      el.style.transition = originalTransition;
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [selectedBlock]);
+
   // parentSection: the actual section container (header/section/footer)
   const parentSection = selectedSection 
     ? newsletter?.sections.find(s => s.id === selectedSection)
     : null;
 
-  // block: the selected child block within the section (search flat + grid)
+  // block: the selected child block within the section.
+  // In grid sections, rows are the source of truth for updates/renders, so
+  // prioritize row lookup to avoid editing stale mirrored data from `blocks`.
   const block = (() => {
     if (!selectedBlock || !parentSection) return null;
-    const flat = parentSection.blocks?.find(b => b.id === selectedBlock);
-    if (flat) return flat;
-    if (parentSection.rows) {
+    const findInRows = () => {
+      if (!parentSection.rows) return null;
       for (const r of parentSection.rows) {
         for (const c of r.columns) {
           const found = c.blocks?.find(b => b.id === selectedBlock);
           if (found) return found;
         }
       }
+      return null;
+    };
+    const findInFlat = () => parentSection.blocks?.find(b => b.id === selectedBlock) || null;
+
+    if (isGridSection(parentSection)) {
+      return findInRows() || findInFlat();
     }
-    return null;
+
+    const flat = findInFlat();
+    if (flat) return flat;
+    return findInRows();
   })();
 
   // 'section' alias: when editing a block, points to block (backward compat
@@ -242,20 +297,55 @@ function SidebarEditor({
     setGifProgress(0);
 
     try {
-      const result = await exportMarqueeAsGif(marqueeBlock, {
-        width: 600,
-        onProgress: (progress) => setGifProgress(progress)
-      });
+      const KINETIC = ['marquee-horizontal', 'marquee-diagonal', 'variable-scale', 'kinetic-stack', 'dual-word', 'tag-marquee'];
+      const isKinetic = KINETIC.includes(marqueeBlock.preset);
+
+      let result;
+      if (isKinetic) {
+        // DOM capture — the kinetic renderer is too complex to mirror on canvas.
+        result = await exportBlockAsGifFromDOM(marqueeBlock.id, {
+          duration: 3000,
+          fps: 12,
+          onProgress: setGifProgress,
+        });
+      } else {
+        result = await exportMarqueeAsGif(marqueeBlock, {
+          width: 600,
+          onProgress: setGifProgress,
+        });
+      }
 
       downloadBlob(result.blob, `marquee-${Date.now()}.gif`);
     } catch (error) {
       console.error('GIF export failed:', error);
-      alert('Failed to export GIF. Please try again.');
+      alert('Failed to export GIF: ' + error.message);
     } finally {
       setIsExportingGif(false);
       setGifProgress(0);
     }
   }, [block, section]);
+
+  const handleExportAnimatedTextGif = useCallback(async () => {
+    if (!block || block.type !== 'animatedText') {
+      alert('Animated Text block not found.');
+      return;
+    }
+    setIsExportingGif(true);
+    setGifProgress(0);
+    try {
+      const result = await exportAnimatedTextAsGif(block, {
+        width: 700,
+        onProgress: setGifProgress,
+      });
+      downloadBlob(result.blob, `animated-text-${Date.now()}.gif`);
+    } catch (error) {
+      console.error('Animated Text GIF export failed:', error);
+      alert('Failed to export GIF: ' + error.message);
+    } finally {
+      setIsExportingGif(false);
+      setGifProgress(0);
+    }
+  }, [block]);
 
   // Routes field changes to block or section depending on what's selected
   const handleFieldChange = useCallback((field, value) => {
@@ -266,12 +356,67 @@ function SidebarEditor({
     }
   }, [selectedSection, selectedBlock, block, onSectionUpdate, onBlockUpdate]);
 
-  // Section-level background helper
+  // Flatten PNG transparency: draw image on a white canvas and return data URL
+  const flattenImageTransparency = useCallback((imageUrl, bgColor = '#FFFFFF') => {
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = bgColor;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0);
+          resolve({ dataUrl: canvas.toDataURL('image/png'), width: img.naturalWidth, height: img.naturalHeight });
+        } catch {
+          resolve({ dataUrl: imageUrl, width: img.naturalWidth, height: img.naturalHeight });
+        }
+      };
+      img.onerror = () => resolve({ dataUrl: imageUrl, width: 0, height: 0 });
+      img.src = imageUrl;
+    });
+  }, []);
+
+  // Auto-set section height from background image dimensions
+  const autoSetHeightFromImage = useCallback((imageUrl) => {
+    if (!imageUrl) return;
+    const img = new window.Image();
+    img.onload = () => {
+      if (img.naturalWidth > 0) {
+        const containerW = 700;
+        const autoHeight = Math.round((img.naturalHeight / img.naturalWidth) * containerW);
+        onSectionUpdate(selectedSection, { height: autoHeight });
+      }
+    };
+    img.src = imageUrl;
+  }, [selectedSection, onSectionUpdate]);
+
+  // Section-level background helper — flattens transparency and auto-sets height
   const handleBackgroundChange = useCallback((field, value) => {
+    if (field === 'image' && value) {
+      const bgColor = parentSection?.background?.color || parentSection?.background?.fallbackColor || '#FFFFFF';
+      flattenImageTransparency(value, bgColor).then(({ dataUrl, width, height }) => {
+        const updates = {
+          background: { ...(parentSection?.background || {}), image: dataUrl },
+        };
+        if (width > 0) {
+          const containerW = 700;
+          const autoHeight = Math.round((height / width) * containerW);
+          onSectionUpdate(selectedSection, { ...updates, height: autoHeight });
+        } else {
+          onSectionUpdate(selectedSection, updates);
+        }
+      });
+      return;
+    }
+
     onSectionUpdate(selectedSection, {
       background: { ...(parentSection?.background || {}), [field]: value },
     });
-  }, [selectedSection, parentSection, onSectionUpdate]);
+  }, [selectedSection, parentSection, onSectionUpdate, flattenImageTransparency]);
 
   // Section-level padding helper
   const handlePaddingChange = useCallback((side, value) => {
@@ -299,30 +444,44 @@ function SidebarEditor({
   }, [section, handleBackgroundChange]);
 
   const handleLogoSelect = useCallback((logoUrl, logoData) => {
-    // Cover images → set as section background
+    // Cover images → set as section background (flatten transparency)
     if (logoData?.category === 'cover' && parentSection) {
-      onSectionUpdate(selectedSection, {
-        background: {
-          ...(parentSection.background || {}),
-          type: 'image',
-          image: logoUrl,
-          imageSize: 'cover',
-          imagePosition: 'center',
-        },
+      const bgColor = parentSection.background?.color || '#FFFFFF';
+      flattenImageTransparency(logoUrl, bgColor).then(({ dataUrl, width, height }) => {
+        const updates = {
+          background: {
+            ...(parentSection.background || {}),
+            type: 'image',
+            image: dataUrl,
+            imageSize: 'cover',
+            imagePosition: 'center',
+          },
+        };
+        if (width > 0) {
+          updates.height = Math.round((height / width) * 700);
+        }
+        onSectionUpdate(selectedSection, updates);
       });
       return;
     }
 
-    // Background images → set as section background
+    // Background images → set as section background (flatten transparency)
     if (logoData?.category === 'background' && parentSection) {
-      onSectionUpdate(selectedSection, {
-        background: {
-          ...(parentSection.background || {}),
-          type: 'image',
-          image: logoUrl,
-          imageSize: 'cover',
-          imagePosition: 'center',
-        },
+      const bgColor = parentSection.background?.color || '#FFFFFF';
+      flattenImageTransparency(logoUrl, bgColor).then(({ dataUrl, width, height }) => {
+        const updates = {
+          background: {
+            ...(parentSection.background || {}),
+            type: 'image',
+            image: dataUrl,
+            imageSize: 'cover',
+            imagePosition: 'center',
+          },
+        };
+        if (width > 0) {
+          updates.height = Math.round((height / width) * 700);
+        }
+        onSectionUpdate(selectedSection, updates);
       });
       return;
     }
@@ -338,19 +497,26 @@ function SidebarEditor({
       if (logoBlock) {
         onBlockUpdate?.(selectedSection, logoBlock.id, { src: logoUrl });
       } else {
-        // Fallback: set as section background
-        onSectionUpdate(selectedSection, {
-          background: {
-            ...(parentSection.background || {}),
-            type: 'image',
-            image: logoUrl,
-            imageSize: 'cover',
-            imagePosition: 'center',
-          },
+        // Fallback: set as section background (flatten transparency)
+        const bgColor = parentSection.background?.color || '#FFFFFF';
+        flattenImageTransparency(logoUrl, bgColor).then(({ dataUrl, width, height }) => {
+          const updates = {
+            background: {
+              ...(parentSection.background || {}),
+              type: 'image',
+              image: dataUrl,
+              imageSize: 'cover',
+              imagePosition: 'center',
+            },
+          };
+          if (width > 0) {
+            updates.height = Math.round((height / width) * 700);
+          }
+          onSectionUpdate(selectedSection, updates);
         });
       }
     }
-  }, [block, parentSection, selectedSection, handleFieldChange, onBlockUpdate, onSectionUpdate]);
+  }, [block, parentSection, selectedSection, handleFieldChange, onBlockUpdate, onSectionUpdate, flattenImageTransparency]);
 
   const handleImageUpload = useCallback(async (fileOrUrl, field) => {
     // Handle removal (null/undefined)
@@ -494,12 +660,6 @@ function SidebarEditor({
     handleFieldChange('profiles', newProfiles);
   }, [section, handleFieldChange]);
 
-  const FieldGroup = ({ label, children, className }) => (
-    <div className={cn("space-y-2", className)}>
-      <Label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">{label}</Label>
-      {children}
-    </div>
-  );
 
   // Container settings handler
   const handleContainerChange = useCallback((field, value) => {
@@ -1956,6 +2116,17 @@ function SidebarEditor({
               </FieldGroup>
             </div>
 
+            <FieldGroup label="Border Radius">
+              <NumberInput
+                value={section.borderRadius || 0}
+                onChange={(val) => handleFieldChange('borderRadius', val)}
+                min={0}
+                max={100}
+                step={1}
+                suffix="px"
+              />
+            </FieldGroup>
+
             <FieldGroup label="Display Options">
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm text-zinc-600 cursor-pointer">
@@ -2009,9 +2180,26 @@ function SidebarEditor({
           </>
         )}
 
+        {sequenceImages.length < 2 && (
+          <FieldGroup label="GIF Export">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled
+              className="w-full opacity-60"
+            >
+              <FileImage className="w-4 h-4" />
+              Export as GIF
+            </Button>
+            <p className="text-[10px] text-zinc-400 mt-1">
+              Upload at least 2 frames above to enable GIF export.
+            </p>
+          </FieldGroup>
+        )}
+
         <div className="p-3 bg-amber-50 rounded-xl border border-amber-200">
           <p className="text-[10px] text-amber-700">
-            <strong>📧 Email Note:</strong> Most email clients support GIFs. Export your sequence as a GIF for better compatibility.
+            <strong>Email Note:</strong> Most email clients support GIFs. Export your sequence as a GIF for better compatibility.
           </p>
         </div>
       </div>
@@ -2179,6 +2367,69 @@ function SidebarEditor({
     </div>
   );
 
+  const renderImageGridEditor = () => (
+    <div className="space-y-6">
+      {renderContainerSettings()}
+
+      <FieldGroup label="Grid Layout">
+        <div className="grid grid-cols-2 gap-1.5">
+          {[
+            { id: 'two-equal',   label: '2 Equal',     visual: '⬜⬜' },
+            { id: 'two-wide',    label: '2 Wide (5/7)', visual: '◻️⬜' },
+            { id: 'three-equal', label: '3 Equal',      visual: '⬜⬜⬜' },
+            { id: 'two-by-two',  label: '2×2 Grid',     visual: '⊞' },
+          ].map(({ id, label }) => (
+            <button
+              key={id}
+              onClick={() => handleFieldChange('gridPreset', id)}
+              className={cn(
+                "px-3 py-2 rounded-lg text-xs font-medium transition-all border",
+                (block?.gridPreset || 'two-equal') === id
+                  ? "bg-zinc-900 text-white border-zinc-900"
+                  : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-300"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </FieldGroup>
+
+      <FieldGroup label="Image Height">
+        <NumberInput
+          value={block?.imageHeight || 180}
+          min={60}
+          max={600}
+          step={10}
+          suffix="px"
+          onChange={(val) => handleFieldChange('imageHeight', val)}
+        />
+      </FieldGroup>
+
+      <FieldGroup label="Border Radius">
+        <NumberInput
+          value={block?.imageBorderRadius ?? 12}
+          min={0}
+          max={100}
+          step={1}
+          suffix="px"
+          onChange={(val) => handleFieldChange('imageBorderRadius', val)}
+        />
+      </FieldGroup>
+
+      <FieldGroup label="Gap">
+        <NumberInput
+          value={block?.imageGap ?? 8}
+          min={0}
+          max={32}
+          step={1}
+          suffix="px"
+          onChange={(val) => handleFieldChange('imageGap', val)}
+        />
+      </FieldGroup>
+    </div>
+  );
+
   const renderMultiLayoutEditor = () => (
     <div className="space-y-6">
       {renderContainerSettings()}
@@ -2190,9 +2441,9 @@ function SidebarEditor({
               key={id}
               onClick={() => handleFieldChange('layout', id)}
               className={cn(
-                "relative rounded-lg overflow-hidden border-2 transition-all",
+                "relative rounded-lg overflow-hidden border transition-all",
                 (block?.layout || 'two-col-wide') === id
-                  ? "border-[#04D1FC] shadow-sm"
+                  ? "border-zinc-400"
                   : "border-zinc-200 hover:border-zinc-300"
               )}
               title={preset.label}
@@ -2203,38 +2454,51 @@ function SidebarEditor({
                 className="w-full h-auto block"
                 style={{ aspectRatio: '3/4', objectFit: 'cover', objectPosition: 'top' }}
               />
-              {(block?.layout || 'two-col-wide') === id && (
-                <div className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-[#04D1FC] flex items-center justify-center">
-                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                </div>
-              )}
             </button>
           ))}
         </div>
       </FieldGroup>
 
-      <FieldGroup label="Badge Text">
-        <EditableInput
-          value={block?.badgeText || 'BUILDER'}
-          onChange={(val) => handleFieldChange('badgeText', val)}
-          sectionKey={selectedSection}
-          placeholder="Badge label"
-        />
+      <FieldGroup label="Badge & Line">
+        <label className="flex items-center gap-2 text-xs text-zinc-600 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={block?.showBadge !== false}
+            onChange={(e) => handleFieldChange('showBadge', e.target.checked)}
+            className="rounded"
+          />
+          Show badge & divider line
+        </label>
       </FieldGroup>
+
+      {block?.showBadge !== false && (
+        <>
+          <FieldGroup label="Badge Text">
+            <EditableInput
+              value={block?.badgeText || 'BUILDER'}
+              onChange={(val) => handleFieldChange('badgeText', val)}
+              sectionKey={selectedSection}
+              placeholder="Badge label"
+            />
+          </FieldGroup>
+        </>
+      )}
 
       <FieldGroup label="Font Sizes">
         <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-zinc-400 w-10 flex-shrink-0">Badge</span>
-            <NumberInput
-              value={block?.badgeFontSize || 19}
-              min={8}
-              max={32}
-              step={1}
-              suffix="px"
-              onChange={(val) => handleFieldChange('badgeFontSize', val)}
-            />
-          </div>
+          {block?.showBadge !== false && (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-zinc-400 w-10 flex-shrink-0">Badge</span>
+              <NumberInput
+                value={block?.badgeFontSize || 19}
+                min={8}
+                max={32}
+                step={1}
+                suffix="px"
+                onChange={(val) => handleFieldChange('badgeFontSize', val)}
+              />
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-zinc-400 w-10 flex-shrink-0">Title</span>
             <NumberInput
@@ -2812,6 +3076,259 @@ function SidebarEditor({
     );
   };
 
+  const renderAnimatedTextEditor = () => {
+    return (
+      <div className="space-y-6">
+        {renderContainerSettings()}
+
+        <FieldGroup label="Text">
+          <LocalInput
+            value={section.text ?? 'TRANSFORM'}
+            onSave={(val) => handleFieldChange('text', val)}
+            placeholder="Animated headline"
+            live
+            className="w-full h-9 px-2 text-sm rounded border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#04D1FC]"
+          />
+          <span className="text-[10px] text-zinc-400 mt-1">Single line of animated text — edits apply live.</span>
+        </FieldGroup>
+
+        <FieldGroup label="Animation">
+          {(() => {
+            const ANIMATED_TEXT_VARIANTS = [
+              { id: 'variable-scale', label: 'Variable Scale', hint: 'Size pulses per character',   thumbnail: '/media-kit/animtext-variable-scale.svg' },
+              { id: 'kinetic-stack',  label: 'Kinetic Stack',  hint: 'Rotation + weight wave',      thumbnail: '/media-kit/animtext-kinetic-stack.svg'  },
+              { id: 'mirror-fold',    label: 'Mirror Fold',    hint: 'Symmetric reflection',        thumbnail: '/media-kit/animtext-mirror-fold.svg'    },
+              { id: 'glitch-rgb',     label: 'Glitch RGB',     hint: 'Channel split + slice',       thumbnail: '/media-kit/animtext-glitch-rgb.svg'     },
+              { id: 'neon-pulse',     label: 'Neon Pulse',     hint: 'Glowing pulse',               thumbnail: '/media-kit/animtext-neon-pulse.svg'     },
+              { id: 'wave-flow',      label: 'Wave Flow',      hint: 'Smooth vertical wave',        thumbnail: '/media-kit/animtext-wave-flow.svg'      },
+              { id: 'typewriter',     label: 'Typewriter',     hint: 'Character reveal',            thumbnail: '/media-kit/animtext-typewriter.svg'     },
+              { id: 'shadow-stack',   label: 'Shadow Stack',   hint: '3D layered shadows',          thumbnail: '/media-kit/animtext-shadow-stack.svg'   },
+            ];
+            const activeVariant = section.variant || 'variable-scale';
+            return (
+              <div className="grid grid-cols-2 gap-1.5">
+                {ANIMATED_TEXT_VARIANTS.map((opt) => {
+                  const active = activeVariant === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => handleFieldChange('variant', opt.id)}
+                      title={`${opt.label} — ${opt.hint}`}
+                      className={cn(
+                        "relative rounded-lg overflow-hidden border transition-all cursor-pointer select-none",
+                        active
+                          ? "border-[#04D1FC] ring-2 ring-[#04D1FC]/40 shadow-sm"
+                          : "border-zinc-200 hover:border-zinc-300"
+                      )}
+                    >
+                      <img
+                        src={opt.thumbnail}
+                        alt={opt.label}
+                        className="w-full h-auto block"
+                        style={{ aspectRatio: '16/7', objectFit: 'cover' }}
+                      />
+                      <div className={cn(
+                        "px-2 py-1 text-left",
+                        active ? "bg-[#04D1FC]/10" : "bg-white"
+                      )}>
+                        <div className={cn(
+                          "text-[11px] font-semibold leading-tight",
+                          active ? "text-zinc-900" : "text-zinc-700"
+                        )}>
+                          {opt.label}
+                        </div>
+                        <div className="text-[9px] text-zinc-500 mt-0.5 leading-snug truncate">
+                          {opt.hint}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
+          <span className="text-[10px] text-zinc-400 mt-2 block">All variants render to GIF on Copy to Gmail.</span>
+        </FieldGroup>
+
+        <div className="grid grid-cols-2 gap-3">
+          <FieldGroup label="Wave Speed">
+            <Select
+              value={section.waveSpeed ?? 3}
+              onChange={(e) => handleFieldChange('waveSpeed', parseFloat(e.target.value))}
+            >
+              {['1.5', '2', '3', '4', '6', '8'].map((n) => (
+                <option key={n} value={n}>{n}s</option>
+              ))}
+            </Select>
+          </FieldGroup>
+          <FieldGroup label="Intensity">
+            <Select
+              value={section.waveIntensity || 'medium'}
+              onChange={(e) => handleFieldChange('waveIntensity', e.target.value)}
+            >
+              <option value="subtle">Subtle</option>
+              <option value="medium">Medium</option>
+              <option value="dramatic">Dramatic</option>
+            </Select>
+          </FieldGroup>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <FieldGroup label="Background">
+            <input
+              type="color"
+              value={section.backgroundColor || '#0A0A0A'}
+              onChange={(e) => handleFieldChange('backgroundColor', e.target.value)}
+              className="w-full h-10 rounded-lg border border-zinc-200 cursor-pointer"
+            />
+          </FieldGroup>
+          <FieldGroup label="Text Color">
+            <input
+              type="color"
+              value={section.textColor || '#FF2D2D'}
+              onChange={(e) => handleFieldChange('textColor', e.target.value)}
+              className="w-full h-10 rounded-lg border border-zinc-200 cursor-pointer"
+            />
+          </FieldGroup>
+        </div>
+
+        {['mirror-fold', 'neon-pulse', 'shadow-stack'].includes(section.variant || 'variable-scale') && (
+          <FieldGroup label="Accent Color">
+            <input
+              type="color"
+              value={section.textColor2 || '#FFFFFF'}
+              onChange={(e) => handleFieldChange('textColor2', e.target.value)}
+              className="w-full h-10 rounded-lg border border-zinc-200 cursor-pointer"
+            />
+            <span className="text-[10px] text-zinc-400 mt-1">Secondary color used by this variant.</span>
+          </FieldGroup>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <FieldGroup label="Font Family">
+            <Select
+              value={section.fontFamily || 'Impact'}
+              onChange={(e) => handleFieldChange('fontFamily', e.target.value)}
+            >
+              {['Impact', 'Anton', 'Bebas Neue', 'Oswald', 'Black Ops One', 'Dela Gothic One', 'Archivo Black', 'Passion One', 'Righteous', 'Secular One', 'Poppins', 'Inter'].map((f) => (
+                <option key={f} value={f}>{f}</option>
+              ))}
+            </Select>
+          </FieldGroup>
+          <FieldGroup label="Font Size">
+            <NumberInput
+              value={section.fontSize || 96}
+              onChange={(val) => handleFieldChange('fontSize', val)}
+              suffix="px"
+            />
+          </FieldGroup>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <FieldGroup label="Font Weight">
+            <Select
+              value={section.fontWeight || '900'}
+              onChange={(e) => handleFieldChange('fontWeight', e.target.value)}
+            >
+              {['400', '500', '600', '700', '800', '900'].map((w) => (
+                <option key={w} value={w}>{w}</option>
+              ))}
+            </Select>
+          </FieldGroup>
+          <FieldGroup label="Letter Spacing">
+            <Select
+              value={section.letterSpacing || '-0.02em'}
+              onChange={(e) => handleFieldChange('letterSpacing', e.target.value)}
+            >
+              {['-0.05em', '-0.03em', '-0.02em', '0em', '0.02em', '0.05em', '0.1em'].map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </Select>
+          </FieldGroup>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <FieldGroup label="Text Transform">
+            <Select
+              value={section.textTransform || 'uppercase'}
+              onChange={(e) => handleFieldChange('textTransform', e.target.value)}
+            >
+              <option value="none">None</option>
+              <option value="uppercase">UPPERCASE</option>
+              <option value="lowercase">lowercase</option>
+              <option value="capitalize">Capitalize</option>
+            </Select>
+          </FieldGroup>
+          <FieldGroup label="Text Align">
+            <Select
+              value={section.textAlign || 'center'}
+              onChange={(e) => handleFieldChange('textAlign', e.target.value)}
+            >
+              <option value="left">Left</option>
+              <option value="center">Center</option>
+              <option value="right">Right</option>
+            </Select>
+          </FieldGroup>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <FieldGroup label="Padding Y">
+            <NumberInput
+              value={section.paddingY ?? 48}
+              onChange={(val) => handleFieldChange('paddingY', val)}
+              suffix="px"
+            />
+          </FieldGroup>
+          <FieldGroup label="Padding X">
+            <NumberInput
+              value={section.paddingX ?? 24}
+              onChange={(val) => handleFieldChange('paddingX', val)}
+              suffix="px"
+            />
+          </FieldGroup>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm text-zinc-600 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={section.pauseOnHover !== false}
+              onChange={(e) => handleFieldChange('pauseOnHover', e.target.checked)}
+              className="rounded border-zinc-300 text-[#04D1FC] focus:ring-[#04D1FC]"
+            />
+            Pause on hover
+          </label>
+        </div>
+
+        <FieldGroup label="GIF Export">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleExportAnimatedTextGif()}
+            disabled={isExportingGif}
+            className="w-full"
+          >
+            {isExportingGif ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Exporting... {gifProgress}%
+              </>
+            ) : (
+              <>
+                <FileImage className="w-4 h-4" />
+                Export as GIF
+              </>
+            )}
+          </Button>
+          <p className="text-[9px] text-zinc-400 mt-1">
+            Download this animation as a GIF — also auto-embedded on Copy to Gmail.
+          </p>
+        </FieldGroup>
+      </div>
+    );
+  };
+
   const renderMarqueeEditor = () => {
     // Normalize items: backward compat for legacy comma-separated strings
     const getItemsArray = () => {
@@ -2868,10 +3385,237 @@ function SidebarEditor({
       }
     };
 
+    const preset = section.preset || 'classic';
+    const isKinetic = preset !== 'classic';
+
+    const PRESET_OPTIONS = [
+      { id: 'classic',            label: 'Classic Ticker', hint: 'Single-row scrolling items',     thumbnail: '/media-kit/marquee-classic.svg'    },
+      { id: 'marquee-horizontal', label: 'Horizontal',     hint: 'Multi-row infinite scroll',      thumbnail: '/media-kit/marquee-horizontal.svg' },
+      { id: 'marquee-diagonal',   label: 'Diagonal',       hint: 'Rotated scrolling strips',       thumbnail: '/media-kit/marquee-diagonal.svg'   },
+      { id: 'dual-word',          label: 'Dual Word',      hint: 'Alternating word transitions',   thumbnail: '/media-kit/marquee-dual-word.svg'  },
+      { id: 'tag-marquee',        label: 'Tag Marquee',    hint: 'Scrolling colored pill tags',    thumbnail: '/media-kit/marquee-tag.svg'        },
+    ];
+
+    const switchPreset = (presetId) => {
+      // eslint-disable-next-line no-console
+      console.log('[marquee-preset] switchPreset ->', {
+        presetId,
+        selectedSection,
+        selectedBlock,
+        blockType: block?.type,
+        currentPreset: section?.preset,
+      });
+      if (selectedBlock && block) {
+        onBlockUpdate?.(selectedSection, selectedBlock, { preset: presetId });
+      } else if (selectedSection) {
+        onSectionUpdate?.(selectedSection, { preset: presetId });
+      }
+    };
+
+    const activeLabel = PRESET_OPTIONS.find(o => o.id === preset)?.label || 'Classic Ticker';
+    // Use the LAST segment of the id (after the last `-`) so each block shows a
+    // distinct short tag. Slice(0,8) would print "block-17" for every entry.
+    const shortenId = (id) => {
+      if (!id) return 'none';
+      const s = String(id);
+      const parts = s.split('-');
+      return parts[parts.length - 1] || s.slice(-5);
+    };
+    const shortBlockId = shortenId(selectedBlock);
+
+    // Collect every marquee block across the whole newsletter so the user can
+    // confirm which one they're editing – catches the "edited block != visible
+    // block" foot-gun when a newsletter has more than one marquee.
+    const allMarqueeBlocks = [];
+    (newsletter?.sections || []).forEach((sec) => {
+      const pushBlock = (b) => {
+        if (b?.type === 'marquee') {
+          allMarqueeBlocks.push({
+            sectionId: sec.id,
+            sectionName: sec.name || sec.type || 'Section',
+            blockId: b.id,
+            preset: b.preset || 'classic',
+          });
+        }
+      };
+      // Grid sections keep both a legacy flat `blocks` mirror and canonical
+      // nested `rows`; listing both creates false duplicate-id warnings.
+      if (isGridSection(sec)) {
+        (sec.rows || []).forEach((r) => (r.columns || []).forEach((c) => (c.blocks || []).forEach(pushBlock)));
+      } else {
+        (sec.blocks || []).forEach(pushBlock);
+      }
+    });
+
     return (
     <div className="space-y-6">
       {renderContainerSettings()}
 
+      <FieldGroup label="Marquee Preset">
+        <div className="mb-2 px-2.5 py-1.5 rounded-md bg-zinc-900 text-white text-[11px] font-medium space-y-0.5">
+          <div className="flex items-center justify-between">
+            <span className="opacity-70">Current preset</span>
+            <span className="font-semibold">{activeLabel}</span>
+          </div>
+          <div className="flex items-center justify-between opacity-60">
+            <span>Block</span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono">{shortBlockId}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!selectedBlock) return;
+                  const el = document.querySelector(`[data-block-id="${selectedBlock}"]`);
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.style.transition = 'box-shadow 0.3s';
+                    el.style.boxShadow = '0 0 0 4px rgba(4,209,252,0.7)';
+                    setTimeout(() => { el.style.boxShadow = ''; }, 1500);
+                  }
+                }}
+                className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 transition-colors"
+              >
+                show
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {PRESET_OPTIONS.map((opt) => {
+            const active = preset === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => switchPreset(opt.id)}
+                title={`${opt.label} — ${opt.hint}`}
+                className={cn(
+                  "relative rounded-lg overflow-hidden border transition-all cursor-pointer select-none group",
+                  active
+                    ? "border-[#04D1FC] ring-2 ring-[#04D1FC]/40 shadow-sm"
+                    : "border-zinc-200 hover:border-zinc-300"
+                )}
+              >
+                <img
+                  src={opt.thumbnail}
+                  alt={opt.label}
+                  className="w-full h-auto block"
+                  style={{ aspectRatio: '16/7', objectFit: 'cover' }}
+                />
+                <div className={cn(
+                  "px-2 py-1 text-left",
+                  active ? "bg-[#04D1FC]/10" : "bg-white"
+                )}>
+                  <div className={cn(
+                    "text-[11px] font-semibold leading-tight",
+                    active ? "text-zinc-900" : "text-zinc-700"
+                  )}>
+                    {opt.label}
+                  </div>
+                  <div className="text-[9px] text-zinc-500 mt-0.5 leading-snug truncate">
+                    {opt.hint}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        <span className="text-[10px] text-zinc-400 mt-2 block">
+          Tap a preset to switch the marquee style. The editable controls below change for each preset.
+        </span>
+        <span className="text-[10px] text-zinc-400 mt-1 block">
+          Looking for <strong>Variable Scale</strong> or <strong>Kinetic Stack</strong>? Drag the <strong>Animated Text</strong> block from the top toolbar.
+        </span>
+
+        {allMarqueeBlocks.length > 1 && (() => {
+          // Detect duplicate block ids (data corruption – these fight each
+          // other during state updates and trigger React key warnings).
+          const idCounts = allMarqueeBlocks.reduce((acc, m) => {
+            acc[m.blockId] = (acc[m.blockId] || 0) + 1;
+            return acc;
+          }, {});
+          const hasDupes = Object.values(idCounts).some((n) => n > 1);
+
+          return (
+            <div className="mt-3 p-2 rounded-md bg-amber-50 border border-amber-200">
+              <div className="text-[10px] font-semibold text-amber-800 mb-1.5">
+                ⚠ This newsletter has {allMarqueeBlocks.length} marquee blocks. Make sure you're editing the right one:
+              </div>
+              {hasDupes && (
+                <div className="text-[10px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1 mb-2">
+                  Duplicate block IDs detected — reload the page to auto-heal, or use the delete buttons below to remove extras.
+                </div>
+              )}
+              <div className="space-y-1">
+                {allMarqueeBlocks.map((m, idx) => {
+                  const isCurrent = m.blockId === selectedBlock;
+                  const isDupe = idCounts[m.blockId] > 1;
+                  return (
+                    <div
+                      key={`${m.sectionId}::${m.blockId}::${idx}`}
+                      className={cn(
+                        "w-full px-2 py-1.5 rounded text-[10px] flex items-center justify-between gap-2 transition-colors",
+                        isCurrent
+                          ? "bg-amber-200/80 text-amber-900 font-semibold"
+                          : isDupe
+                            ? "bg-red-50 text-red-800"
+                            : "bg-white text-zinc-700"
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => onBlockClick?.(m.sectionId, m.blockId)}
+                        className="flex items-center gap-2 flex-1 min-w-0 text-left hover:opacity-80"
+                      >
+                        <span className="font-mono truncate">{shortenId(m.blockId)}</span>
+                        <span className="text-zinc-500 truncate flex-1">{m.sectionName}</span>
+                        <span className={cn(
+                          "px-1.5 py-0.5 rounded text-[9px] font-semibold flex-shrink-0",
+                          isCurrent ? "bg-amber-900/20 text-amber-900" : "bg-zinc-100 text-zinc-600"
+                        )}>
+                          {PRESET_OPTIONS.find(o => o.id === m.preset)?.label || m.preset}
+                        </span>
+                      </button>
+                      {isCurrent && <span className="text-amber-700 flex-shrink-0">← editing</span>}
+                      {!isCurrent && onDeleteBlock && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm(`Delete this marquee block from "${m.sectionName}"?`)) {
+                              onDeleteBlock(m.sectionId, m.blockId);
+                            }
+                          }}
+                          title="Delete this marquee block"
+                          className="flex-shrink-0 p-0.5 rounded hover:bg-red-100 text-red-600"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+      </FieldGroup>
+
+      <div className="h-px bg-zinc-200" />
+
+      <div key={`marquee-${selectedBlock || selectedSection}-${preset}`}>
+        {isKinetic
+          ? renderKineticMarqueeFields(section)
+          : renderClassicMarqueeFields(section, itemsArray, { updateItemAt, removeItemAt, moveItem, addTextLayer, addImageLayer, handleImageUpload })}
+      </div>
+    </div>
+    );
+  };
+
+  const renderClassicMarqueeFields = (section, itemsArray, handlers) => {
+    const { updateItemAt, removeItemAt, moveItem, addTextLayer, addImageLayer, handleImageUpload } = handlers;
+    return (
+    <>
       <FieldGroup label="Marquee Layers">
         <div className="space-y-2">
           {itemsArray.map((item, i) => (
@@ -2917,6 +3661,7 @@ function SidebarEditor({
                     value={item.value || ''}
                     onSave={(val) => updateItemAt(i, { value: val })}
                     placeholder="Enter text..."
+                    live
                     className="w-full h-7 px-2 text-xs rounded border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#04D1FC] focus:border-transparent"
                   />
                 )}
@@ -2992,6 +3737,46 @@ function SidebarEditor({
           </Select>
         </FieldGroup>
       </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <FieldGroup label="Rows">
+          <Select
+            value={section.rows || 1}
+            onChange={(e) => handleFieldChange('rows', parseInt(e.target.value))}
+          >
+            {[1, 2, 3, 4, 5, 6, 8, 10].map(n => (
+              <option key={n} value={n}>{n} {n === 1 ? 'row' : 'rows'}</option>
+            ))}
+          </Select>
+          <span className="text-[10px] text-zinc-400 mt-1">Stack multiple tickers vertically</span>
+        </FieldGroup>
+
+        <FieldGroup label="Row Gap">
+          <Select
+            value={section.rowGap ?? 0}
+            onChange={(e) => handleFieldChange('rowGap', parseInt(e.target.value))}
+          >
+            {[0, 2, 4, 6, 8, 12, 16, 24].map(n => (
+              <option key={n} value={n}>{n}px</option>
+            ))}
+          </Select>
+          <span className="text-[10px] text-zinc-400 mt-1">Spacing between rows</span>
+        </FieldGroup>
+      </div>
+
+      {(section.rows || 1) > 1 && (
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm text-zinc-600 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!section.alternateDirections}
+              onChange={(e) => handleFieldChange('alternateDirections', e.target.checked)}
+              className="rounded border-zinc-300 text-[#04D1FC] focus:ring-[#04D1FC]"
+            />
+            Alternate row directions
+          </label>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <FieldGroup label="Background">
@@ -3106,7 +3891,353 @@ function SidebarEditor({
           For email clients without CSS animation support.
         </p>
       </FieldGroup>
-    </div>
+    </>
+    );
+  };
+
+  const renderKineticMarqueeFields = (section) => {
+    const preset = section.preset;
+    const isDiagonal = preset === 'marquee-diagonal';
+    const isDualWord = preset === 'dual-word';
+    const isTagMarquee = preset === 'tag-marquee';
+    const isWave = preset === 'variable-scale' || preset === 'kinetic-stack';
+    const needsText2 = isDualWord || isTagMarquee;
+    const needsText3 = isTagMarquee;
+
+    return (
+    <>
+      <FieldGroup label="Primary Text">
+        <LocalInput
+          value={section.text1 || 'TRANSFORM'}
+          onSave={(val) => handleFieldChange('text1', val)}
+          placeholder="Main word"
+          live
+          className="w-full h-8 px-2 text-xs rounded border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#04D1FC]"
+        />
+      </FieldGroup>
+
+      {needsText2 && (
+        <FieldGroup label="Secondary Text">
+          <LocalInput
+            value={section.text2 || 'EVOLVE'}
+            onSave={(val) => handleFieldChange('text2', val)}
+            placeholder="Second word"
+            live
+            className="w-full h-8 px-2 text-xs rounded border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#04D1FC]"
+          />
+        </FieldGroup>
+      )}
+
+      {needsText3 && (
+        <FieldGroup label="Tertiary Text">
+          <LocalInput
+            value={section.text3 || 'CREATE'}
+            onSave={(val) => handleFieldChange('text3', val)}
+            placeholder="Third word"
+            live
+            className="w-full h-8 px-2 text-xs rounded border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#04D1FC]"
+          />
+        </FieldGroup>
+      )}
+
+      {isTagMarquee && (
+        <FieldGroup label="Tag Words">
+          <textarea
+            value={section.extraWords ?? 'design, motion, kinetic, type, visual, creative, bold, modern, code, art, digital, studio'}
+            onChange={(e) => handleFieldChange('extraWords', e.target.value)}
+            placeholder="Comma-separated words to fill the tags…"
+            rows={3}
+            className="w-full px-2 py-1.5 text-xs rounded border border-zinc-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#04D1FC] resize-y leading-relaxed"
+          />
+          <span className="text-[10px] text-zinc-400 mt-1">
+            Comma-separated. These populate the pills alongside your Primary / Secondary / Tertiary text.
+          </span>
+        </FieldGroup>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <FieldGroup label="Height">
+          <NumberInput
+            value={section.height || 400}
+            onChange={(val) => handleFieldChange('height', val)}
+            suffix="px"
+          />
+        </FieldGroup>
+        <FieldGroup label="Background">
+          <input
+            type="color"
+            value={section.backgroundColor || '#0A0A0A'}
+            onChange={(e) => handleFieldChange('backgroundColor', e.target.value)}
+            className="w-full h-10 rounded-lg border border-zinc-200 cursor-pointer"
+          />
+        </FieldGroup>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <FieldGroup label="Rows">
+          <Select
+            value={section.rowCount || 8}
+            onChange={(e) => handleFieldChange('rowCount', parseInt(e.target.value))}
+          >
+            {[4, 5, 6, 7, 8, 10, 12].map(n => <option key={n} value={n}>{n}</option>)}
+          </Select>
+        </FieldGroup>
+        <FieldGroup label="Row Gap">
+          <Select
+            value={section.rowGap ?? 0}
+            onChange={(e) => handleFieldChange('rowGap', parseInt(e.target.value))}
+          >
+            {[0, 2, 4, 8, 12, 16, 24].map(n => <option key={n} value={n}>{n}px</option>)}
+          </Select>
+        </FieldGroup>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <FieldGroup label="Scroll Speed">
+          <Select
+            value={section.scrollSpeed || 12}
+            onChange={(e) => handleFieldChange('scrollSpeed', parseFloat(e.target.value))}
+          >
+            {['6', '8', '10', '12', '16', '20', '30'].map(n => <option key={n} value={n}>{n}s</option>)}
+          </Select>
+        </FieldGroup>
+        <FieldGroup label="Scroll Direction">
+          <Select
+            value={section.scrollDirection || 'left'}
+            onChange={(e) => handleFieldChange('scrollDirection', e.target.value)}
+          >
+            <option value="left">← Left</option>
+            <option value="right">→ Right</option>
+            <option value="alternate">⇄ Alternate</option>
+          </Select>
+        </FieldGroup>
+      </div>
+
+      {isWave && (
+        <div className="grid grid-cols-2 gap-3">
+          <FieldGroup label="Wave Speed">
+            <Select
+              value={section.waveSpeed || 3}
+              onChange={(e) => handleFieldChange('waveSpeed', parseFloat(e.target.value))}
+            >
+              {['1.5', '2', '3', '4', '6', '8'].map(n => <option key={n} value={n}>{n}s</option>)}
+            </Select>
+          </FieldGroup>
+          <FieldGroup label="Wave Intensity">
+            <Select
+              value={section.waveIntensity || 'medium'}
+              onChange={(e) => handleFieldChange('waveIntensity', e.target.value)}
+            >
+              <option value="subtle">Subtle</option>
+              <option value="medium">Medium</option>
+              <option value="dramatic">Dramatic</option>
+            </Select>
+          </FieldGroup>
+        </div>
+      )}
+
+      {isDiagonal && (
+        <FieldGroup label="Diagonal Angle">
+          <Select
+            value={section.diagonalAngle ?? -25}
+            onChange={(e) => handleFieldChange('diagonalAngle', parseFloat(e.target.value))}
+          >
+            {['-45', '-35', '-25', '-15', '-10', '10', '15', '25', '35', '45'].map(n =>
+              <option key={n} value={n}>{n}°</option>
+            )}
+          </Select>
+        </FieldGroup>
+      )}
+
+      <FieldGroup label="Vertical Alignment">
+        <Select
+          value={section.verticalAlign || 'fill'}
+          onChange={(e) => handleFieldChange('verticalAlign', e.target.value)}
+        >
+          <option value="fill">Fill</option>
+          <option value="center">Center</option>
+          <option value="top">Top</option>
+          <option value="bottom">Bottom</option>
+        </Select>
+      </FieldGroup>
+
+      <div className="grid grid-cols-2 gap-3">
+        <FieldGroup label="Text Color 1">
+          <input
+            type="color"
+            value={section.textColor1 || '#FF2D2D'}
+            onChange={(e) => handleFieldChange('textColor1', e.target.value)}
+            className="w-full h-10 rounded-lg border border-zinc-200 cursor-pointer"
+          />
+        </FieldGroup>
+        <FieldGroup label="Text Color 2">
+          <input
+            type="color"
+            value={section.textColor2 || '#FF2D2D'}
+            onChange={(e) => handleFieldChange('textColor2', e.target.value)}
+            className="w-full h-10 rounded-lg border border-zinc-200 cursor-pointer"
+          />
+        </FieldGroup>
+      </div>
+
+      {!isTagMarquee && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <FieldGroup label="Font Family">
+              <Select
+                value={section.fontFamily || 'Impact'}
+                onChange={(e) => handleFieldChange('fontFamily', e.target.value)}
+              >
+                {['Impact', 'Anton', 'Bebas Neue', 'Oswald', 'Black Ops One', 'Dela Gothic One', 'Archivo Black', 'Passion One', 'Righteous', 'Secular One'].map(f =>
+                  <option key={f} value={f}>{f}</option>
+                )}
+              </Select>
+            </FieldGroup>
+            <FieldGroup label="Font Size">
+              <NumberInput
+                value={section.fontSize || 80}
+                onChange={(val) => handleFieldChange('fontSize', val)}
+                suffix="px"
+              />
+            </FieldGroup>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <FieldGroup label="Font Weight">
+              <Select
+                value={section.fontWeight || '900'}
+                onChange={(e) => handleFieldChange('fontWeight', e.target.value)}
+              >
+                {['400', '500', '600', '700', '800', '900'].map(w =>
+                  <option key={w} value={w}>{w}</option>
+                )}
+              </Select>
+            </FieldGroup>
+            <FieldGroup label="Letter Spacing">
+              <Select
+                value={section.letterSpacing || '-0.02em'}
+                onChange={(e) => handleFieldChange('letterSpacing', e.target.value)}
+              >
+                {['-0.05em', '-0.03em', '-0.02em', '0em', '0.02em', '0.05em', '0.1em'].map(s =>
+                  <option key={s} value={s}>{s}</option>
+                )}
+              </Select>
+            </FieldGroup>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <FieldGroup label="Text Transform">
+              <Select
+                value={section.textTransform || 'uppercase'}
+                onChange={(e) => handleFieldChange('textTransform', e.target.value)}
+              >
+                <option value="none">None</option>
+                <option value="uppercase">UPPERCASE</option>
+                <option value="lowercase">lowercase</option>
+                <option value="capitalize">Capitalize</option>
+              </Select>
+            </FieldGroup>
+            <FieldGroup label="Line Height">
+              <Select
+                value={section.lineHeightRatio ?? 0.95}
+                onChange={(e) => handleFieldChange('lineHeightRatio', parseFloat(e.target.value))}
+              >
+                {['0.8', '0.85', '0.9', '0.95', '1.0', '1.05', '1.1', '1.2'].map(lh =>
+                  <option key={lh} value={lh}>{lh}</option>
+                )}
+              </Select>
+            </FieldGroup>
+          </div>
+        </>
+      )}
+
+      {isTagMarquee && (
+        <>
+          <FieldGroup label="Tag Style">
+            <Select
+              value={section.tagStyle || 'mixed'}
+              onChange={(e) => handleFieldChange('tagStyle', e.target.value)}
+            >
+              <option value="filled">Filled</option>
+              <option value="outlined">Outlined</option>
+              <option value="mixed">Mixed</option>
+            </Select>
+          </FieldGroup>
+
+          <FieldGroup label="Tag Colors">
+            <div className="grid grid-cols-5 gap-1.5">
+              {[1, 2, 3, 4, 5].map(n => (
+                <input
+                  key={n}
+                  type="color"
+                  value={section[`tagColor${n}`] || ['#FF3366', '#7B61FF', '#00C2FF', '#FFB800', '#00E676'][n - 1]}
+                  onChange={(e) => handleFieldChange(`tagColor${n}`, e.target.value)}
+                  className="w-full h-10 rounded-lg border border-zinc-200 cursor-pointer"
+                  title={`Tag Color ${n}`}
+                />
+              ))}
+            </div>
+          </FieldGroup>
+
+          <div className="grid grid-cols-2 gap-3">
+            <FieldGroup label="Tag Font">
+              <Select
+                value={section.tagFontFamily || 'DM Sans'}
+                onChange={(e) => handleFieldChange('tagFontFamily', e.target.value)}
+              >
+                {['DM Sans', 'Inter', 'Poppins', 'Nunito', 'Quicksand', 'Outfit'].map(f =>
+                  <option key={f} value={f}>{f}</option>
+                )}
+              </Select>
+            </FieldGroup>
+            <FieldGroup label="Tag Size">
+              <NumberInput
+                value={section.tagFontSize || 18}
+                onChange={(val) => handleFieldChange('tagFontSize', val)}
+                suffix="px"
+              />
+            </FieldGroup>
+          </div>
+        </>
+      )}
+
+      <div className="flex items-center gap-4">
+        <label className="flex items-center gap-2 text-sm text-zinc-600 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={section.pauseOnHover !== false}
+            onChange={(e) => handleFieldChange('pauseOnHover', e.target.checked)}
+            className="rounded border-zinc-300 text-[#04D1FC] focus:ring-[#04D1FC]"
+          />
+          Pause on hover
+        </label>
+      </div>
+
+      <FieldGroup label="GIF Export">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleExportMarqueeGif()}
+          disabled={isExportingGif}
+          className="w-full"
+        >
+          {isExportingGif ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Exporting... {gifProgress}%
+            </>
+          ) : (
+            <>
+              <FileImage className="w-4 h-4" />
+              Export as GIF
+            </>
+          )}
+        </Button>
+        <p className="text-[9px] text-zinc-400 mt-1">
+          Captures the live animation for email clients without CSS support.
+        </p>
+      </FieldGroup>
+    </>
     );
   };
 
@@ -3727,106 +4858,36 @@ function SidebarEditor({
           </div>
         </FieldGroup>
 
-        {/* Content structure */}
-        {isGridSection(parentSection) ? (
-          /* ── Grid mode: rows & columns ── */
-          <FieldGroup label={`Rows (${parentSection.rows?.length || 0})`}>
-            <div className="space-y-2">
-              {parentSection.rows?.map((row, rowIdx) => (
-                <div key={row.id} className="border border-zinc-200 rounded-md p-2 space-y-1">
-                  <div className="flex items-center gap-1">
-                    <span className="text-[9px] text-zinc-400 font-medium uppercase tracking-wide">Row {rowIdx + 1}</span>
-                    <span className="text-[9px] text-zinc-300 ml-auto">
-                      {row.columns.map(c => c.span).join(' + ')} = 12
-                    </span>
-                  </div>
-                  {row.columns.map((col, colIdx) => (
-                    <div key={col.id} className="pl-2 border-l-2 border-zinc-100 space-y-0.5">
-                      <span className="text-[9px] text-zinc-400">Col {colIdx + 1} ({col.span}/12)</span>
-                      {col.blocks.map((b) => (
-                        <button
-                          key={b.id}
-                          onClick={() => onBlockClick?.(parentSection.id, b.id)}
-                          className={cn(
-                            "w-full flex items-center gap-2 px-2 py-1 rounded text-[10px] transition-all text-left",
-                            selectedBlock === b.id
-                              ? "bg-zinc-900 text-white"
-                              : "bg-zinc-50 text-zinc-600 hover:bg-zinc-100"
-                          )}
-                        >
-                          <span className="capitalize font-medium truncate">{b.type}</span>
-                        </button>
-                      ))}
-                      {col.blocks.length === 0 && (
-                        <p className="text-[9px] text-zinc-300 italic pl-2">empty</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ))}
-
-              {/* Add Row */}
-              <div className="space-y-1 pt-1">
-                <span className="text-[9px] text-zinc-400 font-medium">Add Row</span>
-                <div className="grid grid-cols-3 gap-1">
-                  {ROW_LAYOUTS.map((layout) => (
-                    <button
-                      key={layout.id}
-                      onClick={() => {
-                        const cols = layout.spans.map(span => createGridColumn(span));
-                        const newRow = createGridRow(cols);
-                        onSectionUpdate(selectedSection, {
-                          rows: [...(parentSection.rows || []), newRow],
-                        });
-                      }}
-                      className="h-7 px-1 text-[8px] text-zinc-500 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded transition-colors truncate"
-                      title={layout.label}
-                    >
-                      {layout.label}
-                    </button>
-                  ))}
-                </div>
+        {/* Content structure — flat block list for all section types */}
+        {(() => {
+          const allBlocks = isGridSection(parentSection)
+            ? (parentSection.rows || []).flatMap((r, ri) => (r.columns || []).flatMap(c => c.blocks || []))
+            : (parentSection.blocks || []);
+          return (
+            <FieldGroup label={`Blocks (${allBlocks.length})`}>
+              <div className="space-y-1">
+                {allBlocks.map((b, idx) => (
+                  <button
+                    key={b.id}
+                    onClick={() => onBlockClick?.(parentSection.id, b.id)}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-all text-left",
+                      selectedBlock === b.id
+                        ? "bg-zinc-900 text-white"
+                        : "bg-zinc-50 text-zinc-600 hover:bg-zinc-100"
+                    )}
+                  >
+                    <span className="capitalize font-medium truncate">{b.type}</span>
+                    <span className="ml-auto text-[10px] opacity-50">#{idx + 1}</span>
+                  </button>
+                ))}
+                {allBlocks.length === 0 && (
+                  <p className="text-[10px] text-zinc-400 text-center py-2">No blocks yet</p>
+                )}
               </div>
-            </div>
-          </FieldGroup>
-        ) : (
-          /* ── Legacy flat blocks mode (unchanged) ── */
-          <FieldGroup label={`Blocks (${parentSection.blocks?.length || 0})`}>
-            <div className="space-y-1">
-              {parentSection.blocks?.map((b, idx) => (
-                <button
-                  key={b.id}
-                  onClick={() => onBlockClick?.(parentSection.id, b.id)}
-                  className={cn(
-                    "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-all text-left",
-                    selectedBlock === b.id
-                      ? "bg-zinc-900 text-white"
-                      : "bg-zinc-50 text-zinc-600 hover:bg-zinc-100"
-                  )}
-                >
-                  <span className="capitalize font-medium truncate">{b.type}</span>
-                  <span className="ml-auto text-[10px] opacity-50">#{idx + 1}</span>
-                </button>
-              ))}
-              {(!parentSection.blocks || parentSection.blocks.length === 0) && (
-                <p className="text-[10px] text-zinc-400 text-center py-2">No blocks yet</p>
-              )}
-            </div>
-
-            {/* Convert to Grid */}
-            {parentSection.type === 'section' && (
-              <button
-                onClick={() => {
-                  const rows = blocksToRows(parentSection.blocks || []);
-                  onSectionUpdate(selectedSection, { rows, blocks: parentSection.blocks });
-                }}
-                className="w-full mt-2 h-7 text-[10px] text-zinc-500 hover:text-[#04D1FC] bg-zinc-50 hover:bg-[#04D1FC]/5 border border-dashed border-zinc-200 hover:border-[#04D1FC] rounded-md transition-colors"
-              >
-                Switch to Grid Layout
-              </button>
-            )}
-          </FieldGroup>
-        )}
+            </FieldGroup>
+          );
+        })()}
       </div>
     );
   };
@@ -3838,9 +4899,11 @@ function SidebarEditor({
       case 'text': return renderTextEditor();
       case 'title': return renderSectionHeaderEditor();
       case 'marquee': return renderMarqueeEditor();
+      case 'animatedText': return renderAnimatedTextEditor();
       case 'promoCard': return renderPromoCardEditor();
       case 'image': return renderImageBlockEditor();
       case 'imageCollage': return renderImageCollageEditor();
+      case 'imageGrid': return renderImageGridEditor();
       case 'imageSequence': return renderImageSequenceEditor();
       case 'profileCards': return renderProfileCardsEditor();
       case 'recipe': return renderRecipeEditor();
@@ -3951,6 +5014,24 @@ function SidebarEditor({
                         suffix="px"
                       />
                     </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-zinc-400">Section Gap</span>
+                      <NumberInput
+                        value={newsletter?.pageSettings?.sectionGap ?? 16}
+                        onChange={(val) => onPageSettingsUpdate?.({ sectionGap: val })}
+                        step={4}
+                        suffix="px"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-zinc-400">Section Padding Top</span>
+                    <NumberInput
+                      value={newsletter?.pageSettings?.sectionPaddingTop ?? 20}
+                      onChange={(val) => onPageSettingsUpdate?.({ sectionPaddingTop: val })}
+                      step={4}
+                      suffix="px"
+                    />
                   </div>
                 </FieldGroup>
 
@@ -4040,21 +5121,42 @@ function SidebarEditor({
                   {renderEditor()}
                 </div>
 
-                {block && (
-                  <div className="p-4 border-t border-zinc-100 bg-zinc-50/30">
-                    <Button 
-                      variant="destructive" 
-                      size="sm"
-                      onClick={() => {
-                        if (window.confirm('Delete this block?')) {
-                          onDeleteBlock?.(selectedSection, selectedBlock);
-                        }
-                      }}
-                      className="w-full"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Delete Block
-                    </Button>
+                {(block || parentSection) && (
+                  <div className="p-4 border-t border-zinc-100 bg-zinc-50/30 space-y-2">
+                    {block && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => {
+                          if (window.confirm('Delete this block?')) {
+                            onDeleteBlock?.(selectedSection, selectedBlock);
+                          }
+                        }}
+                        className="w-full"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete Block
+                      </Button>
+                    )}
+                    {parentSection && (
+                      <Button
+                        variant={block ? 'outline' : 'destructive'}
+                        size="sm"
+                        onClick={() => {
+                          const label =
+                            parentSection.type === 'header' ? 'header'
+                              : parentSection.type === 'footer' ? 'footer'
+                              : 'section';
+                          if (window.confirm(`Delete this ${label}? This cannot be undone from here (use Undo).`)) {
+                            onDeleteSection?.(parentSection.id);
+                          }
+                        }}
+                        className="w-full"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete {parentSection.type === 'header' ? 'Header' : parentSection.type === 'footer' ? 'Footer' : 'Section'}
+                      </Button>
+                    )}
                   </div>
                 )}
               </>

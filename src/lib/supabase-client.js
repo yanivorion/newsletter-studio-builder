@@ -13,7 +13,7 @@ try {
           detectSessionInUrl: true,
         },
         global: {
-          fetch: (...args) => fetch(...args).catch(() => new Response(JSON.stringify({ error: 'Network error' }), { status: 0 })),
+          fetch: (...args) => fetch(...args).catch(() => new Response(JSON.stringify({ error: 'Network error' }), { status: 503 })),
         },
       })
     : null;

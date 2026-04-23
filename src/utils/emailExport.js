@@ -28,6 +28,7 @@ function minifyHTML(html) {
     .replace(/"\s+dir/g, '" dir')
     .replace(/"\s+colspan/g, '" colspan')
     .replace(/"\s+rowspan/g, '" rowspan')
+    .replace(/"\s+bgcolor/g, '" bgcolor')
     .trim();
 }
 
@@ -96,6 +97,18 @@ function blockToHtml(block) {
       return `<div style="padding:${block.padding || 0}px 0;text-align:${block.textAlign || 'center'};"><h2 style="margin:0;font-size:${block.fontSize || 18}px;font-weight:${block.fontWeight || 700};color:${block.color || '#FFFFFF'};letter-spacing:${block.letterSpacing || '0.1em'};line-height:${block.lineHeight || 1.2};font-style:${block.fontStyle || 'normal'};">${wrapLink(titleText)}</h2></div>`;
     }
     case 'marquee': return wrapLegacyRowAsBlock(exportMarquee(block));
+    case 'animatedText': {
+      const fontStack = getFontStack(block.fontFamily || 'Impact');
+      const tt = block.textTransform || 'uppercase';
+      const txt = tt === 'uppercase'
+        ? (block.text || '').toUpperCase()
+        : tt === 'lowercase'
+          ? (block.text || '').toLowerCase()
+          : tt === 'capitalize' && block.text
+            ? block.text.charAt(0).toUpperCase() + block.text.slice(1).toLowerCase()
+            : (block.text || '');
+      return `<div style="background:${block.backgroundColor || '#0A0A0A'};padding:${block.paddingY ?? 48}px ${block.paddingX ?? 24}px;text-align:${block.textAlign || 'center'};overflow:hidden;"><div style="font-family:${fontStack};font-size:${block.fontSize || 96}px;font-weight:${block.fontWeight || 900};letter-spacing:${block.letterSpacing || '-0.02em'};line-height:${block.lineHeightRatio || 0.95};color:${block.textColor || '#FF2D2D'};white-space:nowrap;display:inline-block;max-width:100%;">${txt}</div></div>`;
+    }
     case 'promoCard': return wrapLegacyRowAsBlock(exportPromoCard(block));
     case 'multiLayout': return exportMultiLayout(block);
     case 'imageCollage': return wrapLegacyRowAsBlock(exportImageCollage(block));
@@ -158,7 +171,8 @@ function sectionBgStyle(section) {
 function sectionBgImageRow(section) {
   const bg = section.background || {};
   if (bg.type !== 'image' || !bg.image) return '';
-  return `<tr><td style="padding:0;font-size:0;line-height:0;"><img src="${bg.image}" alt="" width="100%" style="display:block;width:100%;height:auto;" /></td></tr>`;
+  const fallback = bg.fallbackColor || bg.color || '#FFFFFF';
+  return `<tr><td style="padding:0;font-size:0;line-height:0;background-color:${fallback};"><img src="${bg.image}" alt="" border="0" width="100%" style="display:block;width:100%;height:auto;border:0;border:none;outline:none;-ms-interpolation-mode:bicubic;background-color:${fallback};" /></td></tr>`;
 }
 
 function sectionHeightStyle(section) {
@@ -167,19 +181,17 @@ function sectionHeightStyle(section) {
   return '';
 }
 
-function renderSectionHtml(section) {
-  // Footer sections use the dedicated exportFooter renderer
+function renderSectionHtml(section, { isFirst = false, sectionPaddingTop = 20 } = {}) {
   if (section.type === 'footer') return null;
 
   const bgStyle = sectionBgStyle(section);
   const hStyle = sectionHeightStyle(section);
   const bgImgRow = sectionBgImageRow(section);
   const pad = section.padding || {};
-  const padStyle = `padding: ${pad.top ?? 24}px ${pad.right ?? 24}px ${pad.bottom ?? 24}px ${pad.left ?? 24}px;`;
+  const extraTop = !isFirst ? sectionPaddingTop : 0;
+  const padStyle = `padding: ${(pad.top ?? 24) + extraTop}px ${pad.right ?? 24}px ${pad.bottom ?? 24}px ${pad.left ?? 24}px;`;
   const br = section.borderRadius ?? 0;
-  const brStyle = br > 0 ? `border-radius:${br}px;overflow:hidden;` : '';
 
-  // Grid mode: rows with columns
   if (Array.isArray(section.rows) && section.rows.length > 0) {
     const nonEmptyRows = section.rows.filter(row =>
       row.columns.some(col => col.blocks && col.blocks.length > 0)
@@ -193,17 +205,25 @@ function renderSectionHtml(section) {
       }).join('');
       return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;table-layout:fixed;"><tr>${colsHtml}</tr></table>`;
     }).join('\n');
-    if (!rowsHtml && !bgImgRow) return `<tr><td style="${bgStyle}${padStyle}${brStyle}">&nbsp;</td></tr>`;
-    return `${bgImgRow}${rowsHtml ? `<tr><td style="${bgStyle}${hStyle}${padStyle}${brStyle}">${rowsHtml}</td></tr>` : ''}`;
+    if (!rowsHtml && !bgImgRow) return wrapSectionRadius(`<tr><td style="${bgStyle}${padStyle}">&nbsp;</td></tr>`, br, bgStyle);
+    const sectionContent = `${bgImgRow}${rowsHtml ? `<tr><td style="${bgStyle}${hStyle}${padStyle}">${rowsHtml}</td></tr>` : ''}`;
+    return wrapSectionRadius(sectionContent, br, bgStyle);
   }
 
-  // New container-based format: flat blocks
   if (Array.isArray(section.blocks)) {
     const blocksHtml = section.blocks.map(block => blockToHtml(block)).join('\n');
-    return `${bgImgRow}<tr><td style="${bgStyle}${hStyle}${padStyle}${brStyle}">${blocksHtml}</td></tr>`;
+    const sectionContent = `${bgImgRow}<tr><td style="${bgStyle}${hStyle}${padStyle}">${blocksHtml}</td></tr>`;
+    return wrapSectionRadius(sectionContent, br, bgStyle);
   }
 
   return null;
+}
+
+// Wrap an entire section's <tr> content in a border-radius clipping div.
+// Uses a single-cell table inside a div with overflow:hidden.
+function wrapSectionRadius(trContent, br, bgStyle) {
+  if (br <= 0) return trContent;
+  return `<tr><td style="padding:0;"><div style="border-radius:${br}px;overflow:hidden;${bgStyle}"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">${trContent}</table></div></td></tr>`;
 }
 
 /**
@@ -322,13 +342,17 @@ export function exportToHTML(newsletter) {
   const innerBorderWidth = pageSettings.innerBorderWidth ?? 0;
   const innerBorderColor = pageSettings.innerBorderColor || '#E5E5E5';
   const innerBorderRadius = pageSettings.innerBorderRadius ?? 0;
+  const sectionGap = pageSettings.sectionGap ?? 16;
+  const sectionPaddingTop = pageSettings.sectionPaddingTop ?? 20;
 
-  const sections = newsletter.sections.map(section => {
-    // New format: grid rows or flat blocks
-    const rendered = renderSectionHtml(section);
+  const renderedSections = newsletter.sections.map((section, idx) => {
+    const isFirst = idx === 0;
+    const rendered = renderSectionHtml(section, { isFirst, sectionPaddingTop });
     if (rendered !== null) return rendered;
 
-    // Legacy format fallback
+    const br = section.borderRadius ?? 0;
+    const bgStyle = sectionBgStyle(section);
+
     let content;
     switch (section.type) {
       case 'header':
@@ -364,11 +388,25 @@ export function exportToHTML(newsletter) {
       default:
         content = '';
     }
-    return section.container ? wrapWithContainer(content, section.container) : content;
-  }).join('\n');
+    let wrapped = section.container ? wrapWithContainer(content, section.container) : content;
+    if (!isFirst && wrapped) {
+      wrapped = `<tr><td style="height:${sectionPaddingTop}px;font-size:0;line-height:0;">&nbsp;</td></tr>${wrapped}`;
+    }
+    return wrapSectionRadius(wrapped, br, bgStyle);
+  });
 
-  // Build inner container style
-  const innerContainerStyle = `background-color: ${innerBg};${innerBorderWidth > 0 ? ` border: ${innerBorderWidth}px solid ${innerBorderColor};` : ''}${innerBorderRadius > 0 ? ` border-radius: ${innerBorderRadius}px;` : ''} overflow: hidden;`;
+  const gapRow = sectionGap > 0
+    ? `<tr><td style="height:${sectionGap}px;font-size:0;line-height:0;background-color:${innerBg};">&nbsp;</td></tr>`
+    : '';
+  const sections = renderedSections.filter(Boolean).join(`\n${gapRow}\n`);
+
+  // Build inner container: use a wrapper div for reliable border-radius clipping
+  const innerTableStyle = `background-color:${innerBg};${innerBorderWidth > 0 ? `border:${innerBorderWidth}px solid ${innerBorderColor};` : ''}`;
+  const needsRadius = innerBorderRadius > 0;
+  const innerWrapStart = needsRadius
+    ? `<div style="border-radius:${innerBorderRadius}px;overflow:hidden;background-color:${innerBg};">`
+    : '';
+  const innerWrapEnd = needsRadius ? '</div>' : '';
 
   return `<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
@@ -420,15 +458,17 @@ export function exportToHTML(newsletter) {
 <body style="margin: 0; padding: 0; background-color: ${outerBg}; font-family: ${FONT_STACKS['default']}; -webkit-font-smoothing: antialiased;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="mso-table-lspace: 0pt; mso-table-rspace: 0pt; background-color: ${outerBg};">
     <tr>
-      <td align="center" style="padding: ${outerPadding}px 10px;">
+      <td align="center" style="padding: ${outerPadding}px 10px; background-color: ${outerBg};">
         <!--[if mso]>
         <table role="presentation" align="center" border="0" cellspacing="0" cellpadding="0" width="700">
         <tr>
         <td>
         <![endif]-->
-        <table role="presentation" class="email-container" width="700" cellspacing="0" cellpadding="0" border="0" style="mso-table-lspace: 0pt; mso-table-rspace: 0pt; ${innerContainerStyle} margin: 0 auto;">
+        ${innerWrapStart}
+        <table role="presentation" class="email-container" width="700" cellspacing="0" cellpadding="0" border="0" style="mso-table-lspace: 0pt; mso-table-rspace: 0pt; ${innerTableStyle} margin: 0 auto;">
           ${sections}
         </table>
+        ${innerWrapEnd}
         <!--[if mso]>
         </td>
         </tr>
@@ -455,15 +495,19 @@ export function exportForGmail(newsletter) {
   const innerBorderWidth = pageSettings.innerBorderWidth ?? 0;
   const innerBorderColor = pageSettings.innerBorderColor || '#E5E5E5';
   const innerBorderRadius = pageSettings.innerBorderRadius ?? 0;
+  const sectionGap = pageSettings.sectionGap ?? 16;
+  const sectionPaddingTop = pageSettings.sectionPaddingTop ?? 20;
 
-  const sections = newsletter.sections.map(section => {
-    // New format: grid rows or flat blocks (same as exportToHTML)
-    const rendered = renderSectionHtml(section);
+  const renderedSections = newsletter.sections.map((section, idx) => {
+    const isFirst = idx === 0;
+    const rendered = renderSectionHtml(section, { isFirst, sectionPaddingTop });
     if (rendered !== null) {
       return section.container ? wrapWithContainer(rendered, section.container) : rendered;
     }
 
-    // Legacy format fallback
+    const br = section.borderRadius ?? 0;
+    const bgStyle = sectionBgStyle(section);
+
     let content;
     switch (section.type) {
       case 'header':
@@ -499,14 +543,32 @@ export function exportForGmail(newsletter) {
       default:
         content = '';
     }
-    return section.container ? wrapWithContainer(content, section.container) : content;
-  }).join('\n');
+    let wrapped = section.container ? wrapWithContainer(content, section.container) : content;
+    if (!isFirst && wrapped) {
+      wrapped = `<tr><td style="height:${sectionPaddingTop}px;font-size:0;line-height:0;">&nbsp;</td></tr>${wrapped}`;
+    }
+    return wrapSectionRadius(wrapped, br, bgStyle);
+  });
 
-  // Build inner container style
-  const innerContainerStyle = `background-color: ${innerBg};${innerBorderWidth > 0 ? ` border: ${innerBorderWidth}px solid ${innerBorderColor};` : ''}${innerBorderRadius > 0 ? ` border-radius: ${innerBorderRadius}px;` : ''} overflow: hidden;`;
+  const gapRow = sectionGap > 0
+    ? `<tr><td style="height:${sectionGap}px;font-size:0;line-height:0;background-color:${innerBg};">&nbsp;</td></tr>`
+    : '';
+  const sections = renderedSections.filter(Boolean).join(`\n${gapRow}\n`);
 
-  // For Gmail - full-width outer frame with centered inner table
-  const html = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="font-family:${FONT_STACKS['default']};"><tr><td align="center" style="background-color:${outerBg};padding:${outerPadding}px;"><table role="presentation" width="700" cellspacing="0" cellpadding="0" border="0" style="${innerContainerStyle}width:700px;table-layout:fixed;">${sections}</table></td></tr></table>`;
+  // Use a wrapper div with overflow:hidden for border-radius clipping.
+  // The outer table provides the background color so clipped corners
+  // reveal it instead of black.
+  const innerTableStyle = `background-color:${innerBg};${innerBorderWidth > 0 ? `border:${innerBorderWidth}px solid ${innerBorderColor};` : ''}`;
+  const needsRadius = innerBorderRadius > 0;
+
+  const innerTable = `<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto;width:700px;${innerTableStyle}table-layout:fixed;font-family:${FONT_STACKS['default']};">${sections}</table>`;
+
+  let html;
+  if (needsRadius) {
+    html = `<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto;width:700px;background-color:${outerBg};"><tr><td style="padding:${outerPadding}px;background-color:${outerBg};"><div style="border-radius:${innerBorderRadius}px;overflow:hidden;background-color:${innerBg};">${innerTable}</div></td></tr></table>`;
+  } else {
+    html = innerTable;
+  }
   
   return minifyHTML(html);
 }
@@ -608,10 +670,16 @@ function exportMarquee(section) {
     return `<span style="white-space: nowrap;">${item.value || ''}</span>${sep}`;
   }).join('');
 
+  const rows = Math.max(1, parseInt(section.rows) || 1);
+  const rowGap = Math.max(0, parseInt(section.rowGap) || 0);
+  const rowHtml = Array.from({ length: rows }, (_, i) => `
+    <div style="white-space:nowrap;${i > 0 && rowGap > 0 ? `margin-top:${rowGap}px;` : ''}">${itemsHtml}</div>
+  `).join('');
+
   return `
     <tr>
       <td style="background-color: ${section.backgroundColor || '#04D1FC'}; padding: ${paddingVertical}px 20px; text-align: center; color: ${section.textColor || '#ffffff'}; font-family: ${fontStack}; font-size: ${fontSize}px; font-weight: ${fontWeight}; letter-spacing: ${section.letterSpacing || '0.02em'};">
-        ${itemsHtml}
+        ${rowHtml}
       </td>
     </tr>`;
 }
@@ -835,107 +903,81 @@ function exportImageCollage(section, isGmail = false) {
   const imageHeight = section.imageHeight || 200;
   const focalPoints = section.focalPoints || [];
   const imageBackgrounds = section.imageBackgrounds || [];
-  const imageOverlays = section.imageOverlays || [];
   const layout = section.layout || '4-grid';
-  
-  // Get the preset
+
   const preset = COLLAGE_PRESETS[layout] || COLLAGE_PRESETS['4-grid'];
   const rows = preset.length;
   const cols = preset[0]?.length || 1;
-  
-  // Row height for aspect ratio
+
   const rowHeightUnit = Math.floor(imageHeight / rows);
-  
-  // Build a map of cells with their spans
+
   const cellMap = new Map();
   const processedIds = new Set();
-  
+
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const cellId = preset[r][c];
       if (processedIds.has(cellId)) continue;
-      
-      // Calculate column span
       let colSpan = 1;
-      while (c + colSpan < cols && preset[r][c + colSpan] === cellId) {
-        colSpan++;
-      }
-      
-      // Calculate row span
+      while (c + colSpan < cols && preset[r][c + colSpan] === cellId) colSpan++;
       let rowSpan = 1;
-      while (r + rowSpan < rows && preset[r + rowSpan]?.[c] === cellId) {
-        rowSpan++;
-      }
-      
+      while (r + rowSpan < rows && preset[r + rowSpan]?.[c] === cellId) rowSpan++;
       processedIds.add(cellId);
       cellMap.set(cellId, { row: r, col: c, colSpan, rowSpan, imageIndex: cellId - 1 });
     }
   }
-  
-  // Build HTML rows
+
+  const totalGapH = gap * (cols - 1);
+
   let tableRowsHtml = '';
-  
+
   for (let r = 0; r < rows; r++) {
+    const isLastRow = (r === rows - 1);
     let rowHtml = '<tr>';
     const renderedInThisRow = new Set();
-    
+
     for (let c = 0; c < cols; c++) {
       const cellId = preset[r][c];
-      
-      // Skip if this cell was already rendered (part of a multi-row span from above)
       const cellInfo = cellMap.get(cellId);
       if (!cellInfo || cellInfo.row !== r || renderedInThisRow.has(cellId)) continue;
-      
-      // Check if this cell starts on a previous row (rowspan from above)
       if (cellInfo.row < r) continue;
-      
       renderedInThisRow.add(cellId);
-      
+
       const { colSpan, rowSpan, imageIndex } = cellInfo;
       const image = images[imageIndex];
       const focalPoint = focalPoints[imageIndex] || { x: 50, y: 50 };
       const bgColor = imageBackgrounds[imageIndex] || '';
-      const overlay = imageOverlays[imageIndex] || { color: '', opacity: 0 };
-      
-      // Calculate cell dimensions - use percentages
-      const cellWidthPct = Math.round((colSpan / cols) * 100);
       const cellHeightPx = (rowHeightUnit * rowSpan) + (gap * (rowSpan - 1));
-      
-      // Is this the last column or last row?
-      const isLastColInRow = (c + colSpan >= cols);
-      const isLastRow = (r + rowSpan >= rows);
-      const marginRight = isLastColInRow ? 0 : gap;
-      const marginBottom = isLastRow ? 0 : gap;
-      
-      // Build cell content - use 100% width images with margin for gaps
-      let cellContent;
+
+      const isLastCol = (c + colSpan >= cols);
+      const padRight = isLastCol ? 0 : gap;
+      const padBottom = (isLastRow || r + rowSpan >= rows) ? 0 : gap;
+
+      const widthPct = Math.round((colSpan / cols) * 100);
+
       if (image) {
-        const objectFit = bgColor ? 'contain' : 'cover';
-        const overlayDiv = overlay.color && overlay.opacity > 0 
-          ? `<div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: ${overlay.color}; opacity: ${overlay.opacity / 100};"></div>` 
-          : '';
-        
-        // Use margin for gaps instead of padding - more reliable in email clients
-        cellContent = `
-          <div style="position: relative; width: calc(100% - ${marginRight}px); max-width: calc(100% - ${marginRight}px); height: ${cellHeightPx}px; border-radius: 8px; overflow: hidden; background-color: ${bgColor || 'transparent'}; margin-right: ${marginRight}px; margin-bottom: ${marginBottom}px;">
-            <img src="${image}" alt="Image ${cellId}" style="display: block; width: 100%; max-width: 100%; height: ${cellHeightPx}px; object-fit: ${objectFit}; object-position: ${focalPoint.x}% ${focalPoint.y}%;" />
-            ${overlayDiv}
-          </div>`;
-      } else {
-        cellContent = `
-          <div style="width: calc(100% - ${marginRight}px); height: ${cellHeightPx}px; background-color: #f4f4f5; border-radius: 8px; display: table; margin-right: ${marginRight}px; margin-bottom: ${marginBottom}px;">
-            <div style="display: table-cell; vertical-align: middle; text-align: center; color: #a1a1aa; font-size: 14px;">
-              ${cellId}
-            </div>
-          </div>`;
-      }
-      
-      rowHtml += `
-        <td${colSpan > 1 ? ` colspan="${colSpan}"` : ''}${rowSpan > 1 ? ` rowspan="${rowSpan}"` : ''} width="${cellWidthPct}%" valign="top" style="vertical-align: top;">
-          ${cellContent}
+        rowHtml += `
+        <td${colSpan > 1 ? ` colspan="${colSpan}"` : ''}${rowSpan > 1 ? ` rowspan="${rowSpan}"` : ''} width="${widthPct}%" style="width:${widthPct}%;padding:0 ${padRight}px ${padBottom}px 0;" valign="top">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
+            <td height="${cellHeightPx}" style="height:${cellHeightPx}px;background-image:url('${image}');background-size:${bgColor ? 'contain' : 'cover'};background-position:${focalPoint.x}% ${focalPoint.y}%;background-repeat:no-repeat;background-color:${bgColor || 'transparent'};border-radius:8px;font-size:0;line-height:0;" valign="top">
+              <!--[if gte mso 9]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:100%;height:${cellHeightPx}px;"><v:fill type="frame" src="${image}" /><v:textbox inset="0,0,0,0"><![endif]-->
+              <img src="${image}" alt="" width="100%" height="${cellHeightPx}" style="display:block;width:100%;height:${cellHeightPx}px;border-radius:8px;opacity:0;" />
+              <!--[if gte mso 9]></v:textbox></v:rect><![endif]-->
+            </td>
+          </tr></table>
         </td>`;
+      } else {
+        rowHtml += `
+        <td${colSpan > 1 ? ` colspan="${colSpan}"` : ''}${rowSpan > 1 ? ` rowspan="${rowSpan}"` : ''} width="${widthPct}%" style="width:${widthPct}%;padding:0 ${padRight}px ${padBottom}px 0;" valign="top">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
+            <td height="${cellHeightPx}" style="height:${cellHeightPx}px;background-color:#f4f4f5;border-radius:8px;text-align:center;vertical-align:middle;color:#a1a1aa;font-size:14px;" valign="middle">
+              ${cellId}
+            </td>
+          </tr></table>
+        </td>`;
+      }
     }
-    
+
     rowHtml += '</tr>';
     tableRowsHtml += rowHtml;
   }
@@ -945,7 +987,7 @@ function exportImageCollage(section, isGmail = false) {
   return `
     <tr>
       <td style="background-color: ${section.backgroundColor || '#ffffff'}; padding: 16px;">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="table-layout:fixed">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="table-layout:fixed;">
           ${tableRowsHtml}
         </table>
       </td>
@@ -1029,6 +1071,7 @@ function exportMultiLayout(block) {
   const fontStack = FONT_STACKS['default'];
   const badge = block.badgeText || 'BUILDER';
   const badgeClr = block.badgeColor || '#1a1a3e';
+  const hideBadge = block.showBadge === false;
   const title = linksToHTML(block.title || '');
   const body = linksToHTML((block.body || '')).replace(/\n/g, '<br>');
   const images = block.images || [];
@@ -1053,15 +1096,16 @@ function exportMultiLayout(block) {
       ).join('');
       return `<tr><td style="padding:16px 0 4px;font-size:${tfs}px;font-weight:700;letter-spacing:0.04em;color:#1C1917;text-transform:uppercase;font-family:${fontStack};">${t.title}</td></tr>${subjectsHtml}`;
     }).join('');
+    const trackBadgeHtml = hideBadge ? '' : `<div style="font-size:${bfs}px;font-weight:600;color:${badgeClr};letter-spacing:0.06em;text-transform:uppercase;padding:0 0 4px;">${badge}</div>
+        <hr style="border:none;border-top:1px solid #E5E7EB;margin:0 0 8px;" />`;
     return `
       <div style="font-family:${fontStack};">
-        <div style="font-size:${bfs}px;font-weight:600;color:${badgeClr};letter-spacing:0.06em;text-transform:uppercase;padding:0 0 4px;">${badge}</div>
-        <hr style="border:none;border-top:1px solid #E5E7EB;margin:0 0 8px;" />
+        ${trackBadgeHtml}
         <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${tracksHtml}</table>
       </div>`;
   }
 
-  const badgeHtml = `<div style="font-size:${bfs}px;font-weight:600;color:${badgeClr};letter-spacing:0.06em;text-transform:uppercase;padding:0 0 4px;">${badge}</div>
+  const badgeHtml = hideBadge ? '' : `<div style="font-size:${bfs}px;font-weight:600;color:${badgeClr};letter-spacing:0.06em;text-transform:uppercase;padding:0 0 4px;">${badge}</div>
       <hr style="border:none;border-top:1px solid #E5E7EB;margin:0 0 12px;" />`;
 
   const PRESETS = {
@@ -1069,14 +1113,15 @@ function exportMultiLayout(block) {
     'text-centered':     { rows: [], textOnly: true, centered: true },
     'text-list':         { rows: [], textOnly: true },
     'hero-text':         { rows: [[12]] },
-    'hero-above':        { rows: [[12]], imageAboveBadge: true },
-    'hero-repeat':       { rows: [[5]], repeatSide: true },
-    'hero-side':         { rows: [[5]], sideBySide: true },
+    'hero-above':        { rows: [[6, 6]], splitText: true },
+    'hero-repeat':       { rows: [[5]], repeatSide: true, repeatCount: 3 },
+    'hero-repeat-2':     { rows: [[5]], repeatSide: true, repeatCount: 2 },
+    'hero-side':         { rows: [[12]], splitText: true },
     'two-col-wide':      { rows: [[5, 7]] },
     'three-col':         { rows: [[4, 4, 4]] },
     'two-by-two':        { rows: [[6, 6], [6, 6]] },
     'two-col-equal':     { rows: [[6, 6]] },
-    'two-col-text-side': { rows: [[6, 6]] },
+    'two-col-text-side': { rows: [[6, 6]], pairsText: true },
   };
   const preset = PRESETS[layout] || PRESETS['two-col-wide'];
 
@@ -1092,7 +1137,8 @@ function exportMultiLayout(block) {
   }
 
   if (preset.repeatSide) {
-    const images3 = [images[0], images[1], images[2]].filter(Boolean);
+    const count = preset.repeatCount || 3;
+    const images3 = Array.from({ length: count }, (_, i) => images[i]).filter(Boolean);
     const repeatHtml = images3.map((src, i) => {
       const imgCell = src
         ? `<td style="width:42%;vertical-align:top;padding:0 8px ${i < images3.length - 1 ? 16 : 0}px 0;"><img src="${src}" alt="" style="display:block;width:100%;height:${imgHeight}px;object-fit:cover;border-radius:${borderRadius}px;" /></td>`
@@ -1105,16 +1151,6 @@ function exportMultiLayout(block) {
     </div>`;
   }
 
-  if (preset.sideBySide) {
-    const src0 = images[0];
-    const imgCell = src0
-      ? `<td style="width:42%;vertical-align:top;padding-right:12px;"><img src="${src0}" alt="" style="display:block;width:100%;height:${imgHeight}px;object-fit:cover;border-radius:${borderRadius}px;" /></td>`
-      : `<td style="width:42%;vertical-align:top;padding-right:12px;"><div style="width:100%;height:${imgHeight}px;background:#f4f4f5;border-radius:${borderRadius}px;"></div></td>`;
-    return `<div style="font-family:${fontStack};">
-      ${badgeHtml}
-      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr>${imgCell}<td style="width:58%;vertical-align:middle;"><div style="font-size:${tfs}px;font-weight:700;color:#1C1917;letter-spacing:0.03em;line-height:1.3;margin-bottom:6px;">${title}</div><div style="font-size:${dfs}px;color:#6B7280;line-height:1.65;">${body}</div></td></tr></table>
-    </div>`;
-  }
 
   let imgIdx = 0;
   const imageRowsHtml = preset.rows.map((cols) => {
@@ -1131,7 +1167,9 @@ function exportMultiLayout(block) {
     return `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr>${cellsHtml}</tr></table>`;
   }).join('');
 
-  const textHtml = layout === 'two-col-text-side'
+  const textHtml = preset.pairsText
+    ? `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr>${[0,1].map(() => `<td style="width:50%;vertical-align:top;padding:0 6px;"><div style="font-size:${tfs}px;font-weight:700;color:#1C1917;letter-spacing:0.03em;line-height:1.3;margin-bottom:6px;">${title}</div><div style="font-size:${dfs}px;color:#6B7280;line-height:1.65;font-family:${fontStack};">${body}</div></td>`).join('')}</tr></table>`
+    : preset.splitText
     ? `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr><td style="width:42%;vertical-align:top;padding-right:12px;font-size:${tfs}px;font-weight:700;color:#1C1917;letter-spacing:0.03em;line-height:1.3;">${title}</td><td style="width:58%;vertical-align:top;font-size:${dfs}px;color:#6B7280;line-height:1.65;font-family:${fontStack};">${body}</td></tr></table>`
     : `<div style="font-size:${tfs}px;font-weight:700;color:#1C1917;letter-spacing:0.03em;line-height:1.3;margin-bottom:6px;">${title}</div><div style="font-size:${dfs}px;color:#6B7280;line-height:1.65;">${body}</div>`;
 

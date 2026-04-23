@@ -9,7 +9,8 @@ function ImageSequenceSection({
   showThumbnails = false,
   showFrameCounter = false,
   autoPlay = true,
-  previewHeight = 300
+  previewHeight = 300,
+  borderRadius = 0,
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(autoPlay);
@@ -82,7 +83,7 @@ function ImageSequenceSection({
           height: `${previewHeight}px`,
           position: 'relative',
           overflow: 'hidden',
-          borderRadius: showThumbnails ? '8px' : '0',
+          borderRadius: borderRadius || (showThumbnails ? 8 : 0),
           backgroundColor: backgroundColor
         }}
       >

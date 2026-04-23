@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, useRef, use } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   ArrowLeft, Download, Copy, X, Mail, Undo2, Redo2,
   Clipboard, Check, Save, Upload, FileJson, Eye, Send,
@@ -10,6 +10,7 @@ import {
 import NewsletterEditor from '@/components/editor/NewsletterEditor';
 import SidebarEditor from '@/components/editor/SidebarEditor';
 import FloatingMediaModal from '@/components/editor/FloatingMediaModal';
+import FloatingThemeBar from '@/components/editor/FloatingThemeBar';
 import LayoutCarousel from '@/components/editor/LayoutCarousel';
 import TemplateSelector from '@/components/editor/TemplateSelector';
 import { Button } from '@/components/ui/Button';
@@ -35,10 +36,13 @@ import {
   GRID_COLUMNS,
 } from '@/lib/grid-schema';
 
-export default function EditorPage() {
-  const params = useParams();
+export default function EditorPage({ params: paramsPromise }) {
+  // Next.js 15+ passes `params` as a Promise; unwrap with React.use() once.
+  const params = paramsPromise && typeof paramsPromise.then === 'function'
+    ? use(paramsPromise)
+    : paramsPromise;
   const router = useRouter();
-  const isNew = params.id === 'new';
+  const isNew = params?.id === 'new';
 
   const [selectedSection, setSelectedSection] = useState(null);
   const [selectedBlock, setSelectedBlock] = useState(null);
@@ -109,7 +113,7 @@ export default function EditorPage() {
   useEffect(() => {
     if (isNew) return;
     let cancelled = false;
-    loadNewsletter(params.id).then((projectData) => {
+    loadNewsletter(params?.id).then((projectData) => {
       if (cancelled) return;
       let data = projectData;
       if (!data && hasSavedNewsletter()) data = loadSavedNewsletter();
@@ -117,7 +121,7 @@ export default function EditorPage() {
       setNewsletter(migrateNewsletter(data));
     });
     return () => { cancelled = true; };
-  }, [params.id, isNew, loadNewsletter, hasSavedNewsletter, loadSavedNewsletter]);
+  }, [params?.id, isNew, loadNewsletter, hasSavedNewsletter, loadSavedNewsletter]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -170,11 +174,52 @@ export default function EditorPage() {
   const handleToggleUnlock = useCallback(() => setIsUnlocked((p) => !p), []);
 
   const handleAddSection = (sectionType, preset) => {
-    const newSection = createSection(sectionType, { preset });
-    setNewsletter((prev) => ({
-      ...prev,
-      sections: [...prev.sections, newSection],
-    }));
+    // Header / Footer are singletons with fixed positions.
+    // If one already exists, just select it instead of duplicating.
+    if (sectionType === 'header' || sectionType === 'footer') {
+      const existing = newsletter?.sections?.find((s) => s.type === sectionType);
+      if (existing) {
+        setSelectedSection(existing.id);
+        setSelectedBlock(null);
+        return;
+      }
+      const newSection = createSection(sectionType, { preset });
+      setNewsletter((prev) => {
+        const sections = [...prev.sections];
+        if (sectionType === 'header') {
+          sections.unshift(newSection);
+        } else {
+          sections.push(newSection);
+        }
+        return { ...prev, sections };
+      });
+      setSelectedSection(newSection.id);
+      setSelectedBlock(null);
+      return;
+    }
+
+    // Non-header/footer dock items are actually section presets.
+    // Create them as 'section' with the chosen preset so blocks populate correctly.
+    const SECTION_PRESET_KEYS = new Set([
+      'text', 'promo', 'accent', 'gallery', 'sequence',
+      'marquee', 'profiles', 'recipe',
+    ]);
+    const isPresetKey = SECTION_PRESET_KEYS.has(sectionType);
+    const actualType = sectionType === 'section' || isPresetKey ? 'section' : sectionType;
+    const actualPreset = isPresetKey ? sectionType : preset;
+    const newSection = createSection(actualType, { preset: actualPreset });
+
+    setNewsletter((prev) => {
+      const sections = [...prev.sections];
+      // Insert before the footer if one exists, otherwise append.
+      const footerIdx = sections.findIndex((s) => s.type === 'footer');
+      if (footerIdx === -1) {
+        sections.push(newSection);
+      } else {
+        sections.splice(footerIdx, 0, newSection);
+      }
+      return { ...prev, sections };
+    });
     setSelectedSection(newSection.id);
     setSelectedBlock(null);
   };
@@ -661,6 +706,29 @@ export default function EditorPage() {
     setMediaModalOpen(false);
   }, [mediaTargetBlock, mediaTargetSection, setNewsletter]);
 
+  const handleThemeColor = useCallback((color) => {
+    if (selectedSection) {
+      handleSectionUpdate(selectedSection, {
+        background: { type: 'solid', color },
+      });
+    } else {
+      handlePageSettingsUpdate({ backgroundColor: color });
+    }
+  }, [selectedSection, handleSectionUpdate, handlePageSettingsUpdate]);
+
+  const handleThemeGradient = useCallback((start, end) => {
+    if (selectedSection) {
+      handleSectionUpdate(selectedSection, {
+        background: {
+          type: 'gradient',
+          gradientStart: start,
+          gradientEnd: end,
+          gradientAngle: 135,
+        },
+      });
+    }
+  }, [selectedSection, handleSectionUpdate]);
+
   const handleReorderSections = useCallback(
     (fromIndex, toIndex) => {
       setNewsletter((prev) => {
@@ -1036,7 +1104,7 @@ export default function EditorPage() {
           </button>
           <button
             onClick={() => {
-              const nid = newsletter?.projectId || params.id;
+              const nid = newsletter?.projectId || params?.id;
               if (!nid || nid === 'new') {
                 alert('Save the newsletter first before sharing.');
                 return;
@@ -1061,26 +1129,17 @@ export default function EditorPage() {
 
           <div style={{ width: 1, height: 16, background: 'var(--border)' }} />
 
-          <button onClick={handleEmailPreview} style={{ ...ghostBtn, color: 'var(--accent)' }}>
-            <Eye size={14} /> Email Preview
-          </button>
-          <button onClick={handleCopyDesign} style={{ ...buttonBase, background: copiedDesign ? '#16a34a' : 'rgba(255,255,255,0.5)', color: copiedDesign ? '#fff' : 'var(--text-2)', border: copiedDesign ? 'none' : '1px solid var(--control-border)' }}>
-            {copiedDesign ? <><Check size={13} /> Copied!</> : <><Clipboard size={13} /> Gmail</>}
-          </button>
           <button onClick={handleExport} style={{ ...buttonBase, background: 'var(--text-1)', color: '#fff' }}>
             <Download size={13} /> Export
           </button>
-          <button onClick={() => {
-            setSendSubject(newsletter?.name || '');
-            setShowSendModal(true);
-            setSendStatus('loading');
-            setSubscriberCount(null);
-            fetch('/api/subscribers?status=active&limit=1')
-              .then(r => r.json())
-              .then(d => { setSubscriberCount(d.total || 0); setSendStatus(d.total > 0 ? 'ready' : null); })
-              .catch(() => { setSubscriberCount(0); setSendStatus(null); });
-          }} style={primaryBtn}>
-            <Send size={13} /> Send Campaign
+          <button
+            onClick={handleCopyDesign}
+            style={{
+              ...primaryBtn,
+              background: copiedDesign ? '#16a34a' : primaryBtn.background,
+            }}
+          >
+            {copiedDesign ? <><Check size={13} /> Copied!</> : <><Clipboard size={13} /> Copy to Gmail</>}
           </button>
         </div>
       </header>
@@ -1088,7 +1147,12 @@ export default function EditorPage() {
       {/* Main Editor Area */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Canvas */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: 32, background: 'linear-gradient(145deg, #f1f5f9, #e8edf5)' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: 32, background: 'linear-gradient(145deg, #f1f5f9, #e8edf5)', position: 'relative' }}>
+          <FloatingThemeBar
+            onSelectColor={handleThemeColor}
+            onSelectGradient={handleThemeGradient}
+            selectedSection={selectedSection}
+          />
           <NewsletterEditor
             newsletter={newsletter}
             selectedSection={selectedSection}

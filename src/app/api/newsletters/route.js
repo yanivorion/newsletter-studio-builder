@@ -38,7 +38,11 @@ export async function GET(request) {
       query = query.order('updated_at', { ascending: false });
     }
 
+    // Add logging to measure query execution time
+    const startTime = Date.now();
     const { data, error } = await query;
+    const endTime = Date.now();
+    console.log(`Query execution time: ${endTime - startTime}ms`);
 
     if (error) throw error;
 

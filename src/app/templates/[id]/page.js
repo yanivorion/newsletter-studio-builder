@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, use } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Layers, Loader2, AlertTriangle, Copy, Check,
@@ -18,8 +18,11 @@ const BUILTIN_TEMPLATES = {
   'studio-2-newsletter': { create: createStudio2Template, description: 'Full newsletter with chapters' },
 };
 
-export default function TemplatePage() {
-  const { id } = useParams();
+export default function TemplatePage({ params: paramsPromise }) {
+  const params = paramsPromise && typeof paramsPromise.then === 'function'
+    ? use(paramsPromise)
+    : paramsPromise;
+  const id = params?.id;
   const router = useRouter();
   const { user } = useAuth();
 

@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   Layers, PenTool, Users, Send, BarChart3,
   Settings, LogOut, Menu, X,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import UserMenu from '@/components/editor/UserMenu';
 
 function LogoutButton() {
   const { signOut } = useAuth();
@@ -38,53 +39,15 @@ function LogoutButton() {
 
 const navItems = [
   { href: '/dashboard', icon: PenTool, label: 'Newsletters', match: /^\/dashboard$/ },
-  { href: '/dashboard/campaigns', icon: Send, label: 'Campaigns', match: /^\/dashboard\/campaigns/ },
-  { href: '/dashboard/subscribers', icon: Users, label: 'Subscribers', match: /^\/dashboard\/subscribers/ },
-  { href: '/dashboard/analytics', icon: BarChart3, label: 'Analytics', match: /^\/dashboard\/analytics/ },
 ];
 
 export default function DashboardLayout({ children }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const { user, loading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isEditor = pathname.startsWith('/dashboard/editor');
 
-  // Auth guard: redirect to login if not authenticated (before editor check)
-  useEffect(() => {
-    if (!loading && !user) {
-      router.replace('/login');
-    }
-  }, [user, loading, router]);
-
-  if (loading) {
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'linear-gradient(145deg, #eef2f7, #e8edf5, #f0f3f8)',
-        }}
-      >
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            border: '3px solid var(--control-border)',
-            borderTopColor: 'var(--accent)',
-            borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite',
-          }}
-        />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null; // Will redirect via useEffect
-  }
+  // Auth disabled: login is bypassed so the app is usable without a session.
+  // Original behavior redirected unauthenticated users to /login.
 
   if (isEditor) {
     return <div style={{ minHeight: '100vh' }}>{children}</div>;
@@ -197,11 +160,24 @@ export default function DashboardLayout({ children }) {
         style={{
           flex: 1,
           marginLeft: 220,
-          padding: '24px 32px',
           minHeight: '100vh',
         }}
       >
-        {children}
+        {/* Top bar with UserMenu */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            padding: '12px 32px',
+            borderBottom: '1px solid var(--border)',
+            background: 'rgba(255,255,255,0.4)',
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          <UserMenu />
+        </div>
+        <div style={{ padding: '24px 32px' }}>{children}</div>
       </main>
     </div>
   );

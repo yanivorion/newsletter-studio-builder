@@ -9,6 +9,67 @@ function uid() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+// Walks the full newsletter tree and ensures every section id and block id is
+// unique. Re-assigns any duplicate id we encounter. This fixes "Encountered
+// two children with the same key" warnings and prevents state updates from
+// accidentally applying to the wrong block (a real bug when duplicate ids
+// exist – e.g. after a bad copy operation).
+function dedupeIds(sections) {
+  const seenSections = new Set();
+  const seenBlocks = new Set();
+
+  const nextUniqueBlockId = () => {
+    let id;
+    do {
+      id = `block-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    } while (seenBlocks.has(id));
+    return id;
+  };
+
+  const nextUniqueSectionId = () => {
+    let id;
+    do {
+      id = `section-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    } while (seenSections.has(id));
+    return id;
+  };
+
+  const fixBlock = (block) => {
+    if (!block || typeof block !== 'object') return block;
+    if (!block.id || seenBlocks.has(block.id)) {
+      block = { ...block, id: nextUniqueBlockId() };
+    }
+    seenBlocks.add(block.id);
+    return block;
+  };
+
+  return sections.map((section) => {
+    if (!section || typeof section !== 'object') return section;
+    let next = section;
+    if (!next.id || seenSections.has(next.id)) {
+      next = { ...next, id: nextUniqueSectionId() };
+    }
+    seenSections.add(next.id);
+
+    if (Array.isArray(next.blocks)) {
+      next = { ...next, blocks: next.blocks.map(fixBlock) };
+    }
+    if (Array.isArray(next.rows)) {
+      next = {
+        ...next,
+        rows: next.rows.map((row) => ({
+          ...row,
+          columns: (row.columns || []).map((col) => ({
+            ...col,
+            blocks: (col.blocks || []).map(fixBlock),
+          })),
+        })),
+      };
+    }
+    return next;
+  });
+}
+
 export function isNewFormat(newsletter) {
   if (!newsletter?.sections?.length) return true;
   const first = newsletter.sections[0];
@@ -24,6 +85,8 @@ export function migrateNewsletter(newsletter) {
   } else {
     sections = newsletter.sections.map(migrateSection).map(normalizeSectionDefaults);
   }
+
+  sections = dedupeIds(sections);
 
   const hasFooter = sections.some(s => s.type === 'footer');
   if (!hasFooter) {

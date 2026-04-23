@@ -44,6 +44,10 @@ export default function EditorPage({ params: paramsPromise }) {
   const router = useRouter();
   const isNew = params?.id === 'new';
 
+  // Defer localStorage-dependent values until after mount to avoid SSR/client hydration mismatch.
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => { setHasMounted(true); }, []);
+
   const [selectedSection, setSelectedSection] = useState(null);
   const [selectedBlock, setSelectedBlock] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -749,8 +753,8 @@ export default function EditorPage({ params: paramsPromise }) {
           setNewsletter(migrateNewsletter(JSON.parse(JSON.stringify(template))));
           setShowEditor(true);
         }}
-        hasSavedNewsletter={hasSavedNewsletter()}
-        lastSaveTime={getLastSaveTime()}
+        hasSavedNewsletter={hasMounted && hasSavedNewsletter()}
+        lastSaveTime={hasMounted ? getLastSaveTime() : null}
         onContinueEditing={() => {
           const saved = loadSavedNewsletter();
           if (saved) {
